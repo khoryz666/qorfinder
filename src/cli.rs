@@ -215,7 +215,16 @@ async fn execute(cli: Cli) -> Result<()> {
             mode,
         } => {
             let report = crate::eval::run_eval(
-                &store, &embedder, &corpus, &queries, &qrels, top_k, limit, mode,
+                &store,
+                &embedder,
+                &corpus,
+                &queries,
+                &qrels,
+                crate::eval::EvalOptions {
+                    k: top_k,
+                    limit,
+                    mode,
+                },
             )?;
             println!(
                 "mode: {mode:?}, queries evaluated: {} (skipped, no qrels: {})",

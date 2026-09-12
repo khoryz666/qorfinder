@@ -235,7 +235,8 @@ impl Indexer {
         let vectors = self.embedder.embed_passages(texts)?;
         for (((path, chunk_index), text), vector) in refs.iter().zip(texts).zip(vectors) {
             let fp = file_fps.get(path).copied().unwrap_or((0, 0));
-            self.store.stage_chunk(path, *chunk_index, text, &vector, fp)?;
+            self.store
+                .stage_chunk(path, *chunk_index, text, &vector, fp)?;
         }
         Ok(())
     }

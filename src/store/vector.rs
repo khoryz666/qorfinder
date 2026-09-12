@@ -25,7 +25,9 @@ impl VectorStore {
         };
         let index = Index::new(&options).context("failed to create usearch index")?;
         if path.exists() {
-            let path_str = path.to_str().context("vector index path is not valid UTF-8")?;
+            let path_str = path
+                .to_str()
+                .context("vector index path is not valid UTF-8")?;
             index
                 .load(path_str)
                 .with_context(|| format!("failed to load vector index from {}", path.display()))?;
@@ -61,7 +63,9 @@ impl VectorStore {
                 .context("failed to remove existing vector before re-adding")?;
         }
         self.ensure_capacity(1)?;
-        self.index.add(key, vector).context("failed to add vector")?;
+        self.index
+            .add(key, vector)
+            .context("failed to add vector")?;
         Ok(())
     }
 

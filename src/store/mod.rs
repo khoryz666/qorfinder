@@ -149,15 +149,8 @@ impl Store {
         let path_str = path.display().to_string();
         let cid = chunk_id(&path_str, chunk_index);
         let vkey = vector_key(&path_str, chunk_index);
-        self.lexical.upsert_chunk(
-            &cid,
-            &path_str,
-            chunk_index,
-            text,
-            fingerprint.0,
-            fingerprint.1,
-            vkey,
-        )?;
+        self.lexical
+            .upsert_chunk(&cid, &path_str, chunk_index, text, fingerprint, vkey)?;
         self.vector.add(vkey, vector)?;
 
         let mut pending = self.pending.lock().unwrap();
@@ -282,9 +275,15 @@ mod tests {
         let store = open(dir.path());
         let a = Path::new("/a.txt");
         let b = Path::new("/b.txt");
-        store.stage_chunk(a, 0, "a chunk zero", &[1.0, 0.0, 0.0], (1, 1)).unwrap();
-        store.stage_chunk(b, 0, "b chunk zero", &[0.0, 1.0, 0.0], (1, 1)).unwrap();
-        store.stage_chunk(a, 1, "a chunk one", &[0.0, 0.0, 1.0], (1, 1)).unwrap();
+        store
+            .stage_chunk(a, 0, "a chunk zero", &[1.0, 0.0, 0.0], (1, 1))
+            .unwrap();
+        store
+            .stage_chunk(b, 0, "b chunk zero", &[0.0, 1.0, 0.0], (1, 1))
+            .unwrap();
+        store
+            .stage_chunk(a, 1, "a chunk one", &[0.0, 0.0, 1.0], (1, 1))
+            .unwrap();
         store.commit().unwrap();
 
         let fps = store.file_fingerprints().unwrap();
@@ -299,7 +298,9 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let store = open(dir.path());
         let path = Path::new("/a.txt");
-        store.stage_chunk(path, 0, "first version", &[1.0, 0.0, 0.0], (1, 1)).unwrap();
+        store
+            .stage_chunk(path, 0, "first version", &[1.0, 0.0, 0.0], (1, 1))
+            .unwrap();
         store.commit().unwrap();
 
         store.delete_file(path).unwrap();
@@ -327,7 +328,9 @@ mod tests {
         let store = open(dir.path());
         let path = Path::new("/a.txt");
         assert!(store.file_info(path).unwrap().is_none());
-        store.stage_chunk(path, 0, "text", &[1.0, 0.0, 0.0], (10, 20)).unwrap();
+        store
+            .stage_chunk(path, 0, "text", &[1.0, 0.0, 0.0], (10, 20))
+            .unwrap();
         store.commit().unwrap();
         let info = store.file_info(path).unwrap().unwrap();
         assert_eq!(info.mtime_secs, 10);
@@ -339,8 +342,12 @@ mod tests {
     fn count_reflects_vector_count() {
         let dir = tempfile::tempdir().unwrap();
         let store = open(dir.path());
-        store.stage_chunk(Path::new("/a.txt"), 0, "x", &[1.0, 0.0, 0.0], (1, 1)).unwrap();
-        store.stage_chunk(Path::new("/a.txt"), 1, "y", &[0.0, 1.0, 0.0], (1, 1)).unwrap();
+        store
+            .stage_chunk(Path::new("/a.txt"), 0, "x", &[1.0, 0.0, 0.0], (1, 1))
+            .unwrap();
+        store
+            .stage_chunk(Path::new("/a.txt"), 1, "y", &[0.0, 1.0, 0.0], (1, 1))
+            .unwrap();
         store.commit().unwrap();
         assert_eq!(store.count().unwrap(), 2);
     }
@@ -360,7 +367,15 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         {
             let store = Store::open(dir.path(), 3).unwrap();
-            store.stage_chunk(Path::new("/a.txt"), 0, "persisted", &[1.0, 0.0, 0.0], (1, 1)).unwrap();
+            store
+                .stage_chunk(
+                    Path::new("/a.txt"),
+                    0,
+                    "persisted",
+                    &[1.0, 0.0, 0.0],
+                    (1, 1),
+                )
+                .unwrap();
             store.commit().unwrap();
         }
         let store = Store::open(dir.path(), 3).unwrap();

@@ -13,13 +13,22 @@ const RRF_K: f64 = 60.0;
 /// chunk that ranks well on either side contributes, and one that ranks
 /// well on both is boosted. `SearchHit::score` on the result is the fused
 /// RRF score, not a raw similarity/BM25 value.
-pub fn run_query(store: &Store, embedder: &Embedder, query: &str, top_k: u64) -> Result<Vec<SearchHit>> {
+pub fn run_query(
+    store: &Store,
+    embedder: &Embedder,
+    query: &str,
+    top_k: u64,
+) -> Result<Vec<SearchHit>> {
     let vector = embedder.embed_query(query)?;
     let retrieve = (top_k as usize).saturating_mul(4).max(50);
 
     let mut fused: HashMap<String, (f64, SearchHit)> = HashMap::new();
 
-    for (rank, (key, _distance)) in store.search_vector(&vector, retrieve)?.into_iter().enumerate() {
+    for (rank, (key, _distance)) in store
+        .search_vector(&vector, retrieve)?
+        .into_iter()
+        .enumerate()
+    {
         let Some(chunk) = store.resolve_vector_key(key)? else {
             continue;
         };
@@ -37,7 +46,11 @@ pub fn run_query(store: &Store, embedder: &Embedder, query: &str, top_k: u64) ->
         entry.0 += rrf_score(rank);
     }
 
-    for (rank, hit) in store.search_lexical(query, retrieve)?.into_iter().enumerate() {
+    for (rank, hit) in store
+        .search_lexical(query, retrieve)?
+        .into_iter()
+        .enumerate()
+    {
         let entry = fused.entry(hit.chunk_id).or_insert_with(|| {
             (
                 0.0,

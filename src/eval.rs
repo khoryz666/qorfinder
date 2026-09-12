@@ -186,20 +186,29 @@ pub enum EvalMode {
     Hybrid,
 }
 
+/// Run options for `run_eval`, grouped so the function stays under clippy's
+/// argument-count lint: `k` is the metrics cut-off, `limit` caps how many
+/// *judged* queries are actually embedded and searched, `mode` selects which
+/// retrieval path to score.
+#[derive(Debug, Clone, Copy)]
+pub struct EvalOptions {
+    pub k: usize,
+    pub limit: Option<usize>,
+    pub mode: EvalMode,
+}
+
 /// Run every query against the store and score the results against qrels.
 /// The corpus must already be indexed. Queries without qrels are skipped
-/// (BEIR ships train + test queries together); `limit` caps the number of
-/// *judged* queries that are actually embedded and searched.
+/// (BEIR ships train + test queries together).
 pub fn run_eval(
     store: &Store,
     embedder: &Embedder,
     corpus: &Path,
     queries_path: &Path,
     qrels_path: &Path,
-    k: usize,
-    limit: Option<usize>,
-    mode: EvalMode,
+    options: EvalOptions,
 ) -> Result<EvalReport> {
+    let EvalOptions { k, limit, mode } = options;
     let queries = parse_queries(queries_path)?;
     let qrels = parse_qrels(qrels_path)?;
     let doc_map = build_doc_map(corpus);

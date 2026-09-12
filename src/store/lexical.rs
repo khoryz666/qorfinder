@@ -59,16 +59,22 @@ impl LexicalStore {
         let file_path = schema_builder.add_text_field("file_path", STRING | STORED);
         let chunk_index = schema_builder.add_u64_field(
             "chunk_index",
-            tantivy::schema::NumericOptions::default().set_stored().set_fast(),
+            tantivy::schema::NumericOptions::default()
+                .set_stored()
+                .set_fast(),
         );
         // Default (unstemmed) tokenizer: this tool indexes arbitrary
         // personal files, not just English prose, and an English stemmer
         // would silently corrupt matching on non-English text.
         let text = schema_builder.add_text_field("text", TEXT | STORED);
-        let mtime_secs = schema_builder
-            .add_i64_field("mtime_secs", tantivy::schema::NumericOptions::default().set_stored());
-        let size_bytes = schema_builder
-            .add_i64_field("size_bytes", tantivy::schema::NumericOptions::default().set_stored());
+        let mtime_secs = schema_builder.add_i64_field(
+            "mtime_secs",
+            tantivy::schema::NumericOptions::default().set_stored(),
+        );
+        let size_bytes = schema_builder.add_i64_field(
+            "size_bytes",
+            tantivy::schema::NumericOptions::default().set_stored(),
+        );
         let vector_key = schema_builder.add_u64_field(
             "vector_key",
             tantivy::schema::NumericOptions::default()
@@ -115,8 +121,7 @@ impl LexicalStore {
         file_path: &str,
         chunk_index: u64,
         text: &str,
-        mtime_secs: i64,
-        size_bytes: i64,
+        fingerprint: (i64, i64),
         vector_key: u64,
     ) -> Result<()> {
         let writer = self.writer.lock().unwrap();
@@ -126,8 +131,8 @@ impl LexicalStore {
         doc.add_text(self.fields.file_path, file_path);
         doc.add_u64(self.fields.chunk_index, chunk_index);
         doc.add_text(self.fields.text, text);
-        doc.add_i64(self.fields.mtime_secs, mtime_secs);
-        doc.add_i64(self.fields.size_bytes, size_bytes);
+        doc.add_i64(self.fields.mtime_secs, fingerprint.0);
+        doc.add_i64(self.fields.size_bytes, fingerprint.1);
         doc.add_u64(self.fields.vector_key, vector_key);
         writer
             .add_document(doc)
@@ -148,7 +153,9 @@ impl LexicalStore {
             .unwrap()
             .commit()
             .context("tantivy commit failed")?;
-        self.reader.reload().context("tantivy reader reload failed")?;
+        self.reader
+            .reload()
+            .context("tantivy reader reload failed")?;
         Ok(())
     }
 
@@ -223,7 +230,7 @@ mod tests {
     fn upsert_commit_search_roundtrips() {
         let dir = tempfile::tempdir().unwrap();
         let s = store(dir.path());
-        s.upsert_chunk("a.txt:0", "a.txt", 0, "the quick brown fox", 1, 2, 10)
+        s.upsert_chunk("a.txt:0", "a.txt", 0, "the quick brown fox", (1, 2), 10)
             .unwrap();
         s.commit().unwrap();
         let hits = s.search("quick fox", 5).unwrap();
@@ -236,10 +243,10 @@ mod tests {
     fn upsert_same_chunk_id_replaces_not_duplicates() {
         let dir = tempfile::tempdir().unwrap();
         let s = store(dir.path());
-        s.upsert_chunk("a.txt:0", "a.txt", 0, "original text", 1, 2, 10)
+        s.upsert_chunk("a.txt:0", "a.txt", 0, "original text", (1, 2), 10)
             .unwrap();
         s.commit().unwrap();
-        s.upsert_chunk("a.txt:0", "a.txt", 0, "updated text", 3, 4, 10)
+        s.upsert_chunk("a.txt:0", "a.txt", 0, "updated text", (3, 4), 10)
             .unwrap();
         s.commit().unwrap();
         let hits = s.search("updated", 5).unwrap();
@@ -252,11 +259,11 @@ mod tests {
     fn delete_file_removes_all_its_chunks() {
         let dir = tempfile::tempdir().unwrap();
         let s = store(dir.path());
-        s.upsert_chunk("a.txt:0", "a.txt", 0, "hello world", 1, 2, 10)
+        s.upsert_chunk("a.txt:0", "a.txt", 0, "hello world", (1, 2), 10)
             .unwrap();
-        s.upsert_chunk("a.txt:1", "a.txt", 1, "hello again", 1, 2, 11)
+        s.upsert_chunk("a.txt:1", "a.txt", 1, "hello again", (1, 2), 11)
             .unwrap();
-        s.upsert_chunk("b.txt:0", "b.txt", 0, "hello elsewhere", 1, 2, 12)
+        s.upsert_chunk("b.txt:0", "b.txt", 0, "hello elsewhere", (1, 2), 12)
             .unwrap();
         s.commit().unwrap();
         s.delete_file("a.txt");
@@ -270,7 +277,7 @@ mod tests {
     fn resolve_vector_key_finds_chunk() {
         let dir = tempfile::tempdir().unwrap();
         let s = store(dir.path());
-        s.upsert_chunk("a.txt:0", "a.txt", 0, "hello world", 1, 2, 42)
+        s.upsert_chunk("a.txt:0", "a.txt", 0, "hello world", (1, 2), 42)
             .unwrap();
         s.commit().unwrap();
         let resolved = s.resolve_vector_key(42).unwrap().unwrap();
@@ -290,7 +297,7 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         {
             let s = store(dir.path());
-            s.upsert_chunk("a.txt:0", "a.txt", 0, "persisted text", 1, 2, 10)
+            s.upsert_chunk("a.txt:0", "a.txt", 0, "persisted text", (1, 2), 10)
                 .unwrap();
             s.commit().unwrap();
         }
