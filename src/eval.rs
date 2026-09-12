@@ -176,6 +176,16 @@ pub fn build_doc_map(corpus: &Path) -> HashMap<String, String> {
     map
 }
 
+/// Which retrieval path to score. `Dense` and `Lexical` isolate one side of
+/// the store for comparison; `Hybrid` is what the CLI's `query` command
+/// actually uses in production (RRF fusion of both).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+pub enum EvalMode {
+    Dense,
+    Lexical,
+    Hybrid,
+}
+
 /// Run every query against the store and score the results against qrels.
 /// The corpus must already be indexed. Queries without qrels are skipped
 /// (BEIR ships train + test queries together); `limit` caps the number of
@@ -188,6 +198,7 @@ pub fn run_eval(
     qrels_path: &Path,
     k: usize,
     limit: Option<usize>,
+    mode: EvalMode,
 ) -> Result<EvalReport> {
     let queries = parse_queries(queries_path)?;
     let qrels = parse_qrels(qrels_path)?;
@@ -208,8 +219,23 @@ pub fn run_eval(
             skipped_no_qrels += 1;
             continue;
         };
-        let vector = embedder.embed_query(query)?;
-        let hits = store.search(vector, k as u64)?;
+        let hits: Vec<crate::store::SearchHit> = match mode {
+            EvalMode::Dense => {
+                let vector = embedder.embed_query(query)?;
+                store.search(vector, k as u64)?
+            }
+            EvalMode::Lexical => store
+                .search_lexical(query, k)?
+                .into_iter()
+                .map(|h| crate::store::SearchHit {
+                    file_path: h.file_path,
+                    chunk_index: h.chunk_index,
+                    score: h.score,
+                    text: h.text,
+                })
+                .collect(),
+            EvalMode::Hybrid => crate::query::run_query(store, embedder, query, k as u64)?,
+        };
         let ranked: Vec<String> = dedupe(
             hits.iter()
                 .filter_map(|h| doc_map.get(&h.file_path).cloned())

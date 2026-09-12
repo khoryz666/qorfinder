@@ -1,51 +1,61 @@
 # QorFinder
 
-Local-first semantic search CLI. Two jobs: index a user-chosen directory into a local vector DB (Qdrant), and answer queries as top-k matching chunks with file references.
+An efficient semantic search desktop app for local files, using natural language processing. QorFinder indexes a directory on your machine and answers natural-language queries with the most relevant chunks, entirely offline after the first run — no server, no Docker, no cloud API.
+
+## Objectives
+
+1. **Fast, accurate hybrid search.** Dense (sentence-embedding) and lexical (BM25 keyword) retrieval are run in parallel and fused with Reciprocal Rank Fusion, so exact terms/names that embeddings blur and paraphrases that keywords miss are both covered. Index size is a secondary concern versus speed and accuracy.
+2. **Fully embedded, local-first architecture.** The whole store — lexical index, vector index, and per-file fingerprint bookkeeping — is embedded in-process (tantivy + usearch + redb). There is nothing to install, run, or keep alive besides the `qorfinder` binary itself; incremental re-indexing is O(files), not O(chunks).
+3. **Desktop GUI integration** *(planned, not yet implemented)*. The current milestone ships the search engine as a CLI. A native desktop GUI wrapping this same engine is the next objective, so the tool becomes usable without a terminal.
 
 ## Quick start
 
-```powershell
-# 1. Start Qdrant (gRPC on 6334, REST on 6333)
-docker run -d -p 6333:6333 -p 6334:6334 -v qorfinder_data:/qdrant/storage qdrant/qdrant
-
-# 2. Build (Windows, MSVC toolchain)
+```bash
+# Build (see Develop below for the toolchain)
 cargo build --release
 
-# 3. Index a directory (--once skips watching)
-.\target\release\qorfinder.exe index C:\path\to\docs
-.\target\release\qorfinder.exe index C:\path\to\docs --once
+# Index a directory (--once skips the file-watcher)
+./target/release/qorfinder index ~/Documents --once
 
-# 4. Query
-.\target\release\qorfinder.exe query "what does the text say about zakat" -k 5
+# Query it
+./target/release/qorfinder query "what does the text say about zakat" -k 5
 ```
 
-- First run downloads the ONNX embedding model (~120 MB) into `~/.cache/qorfinder/models`; afterwards everything works offline
-- Supported file types: `txt`, `md`, `markdown`, `pdf`, `docx`
+- First run downloads the ONNX embedding model (~120 MB) into `~/.cache/qorfinder/models`; everything after that is offline.
+- The index lives under `~/.cache/qorfinder/indexes/default` by default (override with `--index-dir` or `QORFINDER_INDEX_DIR`).
+- Supported file types: `txt`, `md`, `markdown`, `pdf`, `docx`.
 
-## Configuration (env vars or flags)
+## Develop
 
-| Env var                 | Flag              | Default                  |
-|-------------------------|-------------------|--------------------------|
-| `QORFINDER_QDRANT_URL`  | `--qdrant`        | `http://localhost:6334`  |
-| `QORFINDER_COLLECTION`  | `--collection`    | `qorfinder`              |
-| `QORFINDER_MODEL_CACHE` | `--model-cache`   | `~/.cache/qorfinder/models` |
+Toolchain (Rust, plus the C/C++ build tools `usearch` needs) is managed by a Nix flake; Rust crates themselves are managed by `cargo` as usual.
 
-## Dependencies
+```bash
+direnv allow      # or: nix develop
+cargo build
+```
 
-| Crate            | Purpose                                    |
-|------------------|--------------------------------------------|
-| `clap`           | CLI argument parsing                       |
-| `notify`         | file watching (debounced)                  |
-| `lopdf`          | PDF text extraction                        |
-| `docx-rs`        | DOCX text extraction                       |
-| `fastembed`      | local ONNX sentence embeddings             |
-| `qdrant-client`  | Qdrant gRPC client (upsert/delete/search)  |
-| `tokio`          | async runtime                              |
-| `walkdir`        | directory traversal                        |
-| `uuid`           | deterministic point IDs                    |
+## Test
 
-## Next Steps
+```bash
+cargo fmt --all -- --check
+cargo clippy --all-targets -- -D warnings
+cargo test --lib
+```
 
-- Want to develop or run tests? See [CONTRIBUTING.md](CONTRIBUTING.md)
-- Curious about internals? See [design/ARCHITECTURE.md](design/ARCHITECTURE.md)
-- Interested in benchmarks? See [design/EVALUATION.md](design/EVALUATION.md)
+Unit tests are fast and fully offline — they never touch the embedding model or build a real index.
+
+For retrieval-quality benchmarks (nDCG/Recall/MRR against BEIR-style corpora), see [BENCHMARK.md](BENCHMARK.md).
+
+## Deploy
+
+```bash
+cargo build --release
+```
+
+The result is a single self-contained binary — no server, database, or container to deploy alongside it. Copy it wherever you want to run it.
+
+## More
+
+- [ARCHITECTURE.drawio](ARCHITECTURE.drawio): pipeline diagram and component descriptions.
+- [BENCHMARK.md](BENCHMARK.md): how QorFinder's retrieval quality and resource use compare to mainstream local-search tools.
+- `ref/`: the original project proposal and background paper.

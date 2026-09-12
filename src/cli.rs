@@ -90,8 +90,13 @@ enum Command {
         /// Evaluate only the first N queries (quick smoke runs)
         #[arg(long)]
         limit: Option<usize>,
+
+        /// Retrieval path to score: the dense side alone, the lexical side
+        /// alone, or the hybrid fusion the `query` command actually uses
+        #[arg(long, value_enum, default_value = "hybrid")]
+        mode: crate::eval::EvalMode,
     },
-    /// Download and prepare a benchmark corpus (no Qdrant needed)
+    /// Download and prepare a benchmark corpus (no server needed)
     Corpus {
         #[command(subcommand)]
         corpus: CorpusKind,
@@ -207,11 +212,13 @@ async fn execute(cli: Cli) -> Result<()> {
             qrels,
             top_k,
             limit,
+            mode,
         } => {
-            let report =
-                crate::eval::run_eval(&store, &embedder, &corpus, &queries, &qrels, top_k, limit)?;
+            let report = crate::eval::run_eval(
+                &store, &embedder, &corpus, &queries, &qrels, top_k, limit, mode,
+            )?;
             println!(
-                "queries evaluated: {} (skipped, no qrels: {})",
+                "mode: {mode:?}, queries evaluated: {} (skipped, no qrels: {})",
                 report.evaluated, report.skipped_no_qrels
             );
             println!("nDCG@{}:  {:.4}", report.k, report.ndcg);
