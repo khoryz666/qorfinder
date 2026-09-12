@@ -1,0 +1,33 @@
+services:
+  qdrant:
+    image: qdrant/qdrant:v1.19.0
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    environment:
+      QORFINDER_QDRANT_URL: http://qdrant:6334
+      QORFINDER_QDRANT_REST_URL: http://qdrant:6333
+    volumes:
+      - .:/workspace
+      - cargo_cache:/usr/local/cargo
+      - cargo_target:/workspace/target
+      - qorfinder_models:/root/.cache/qorfinder
+      - qorfinder_data:/workspace/data
+    depends_on:
+      - qdrant
+    working_dir: /workspace
+    command: sleep infinity
+
+volumes:
+  qdrant_data:
+  cargo_cache:
+  cargo_target:
+  qorfinder_models:
+  qorfinder_data:

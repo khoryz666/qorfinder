@@ -1,0 +1,15 @@
+{
+  "name": "QorFinder Dev",
+  "dockerComposeFile": ["compose.yaml"],
+  "service": "dev",
+  "workspaceFolder": "/workspace",
+  "remoteEnv": {
+    "QORFINDER_QDRANT_URL": "http://qdrant:6334",
+    "QORFINDER_QDRANT_REST_URL": "http://qdrant:6333"
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": ["rust-lang.rust-analyzer"]
+    }
+  }
+}

@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  test:
+    name: test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Lint
+        run: cargo clippy --all-targets -- -D warnings
+
+      # Unit tests only: they exercise parser/chunker/formatter and never touch
+      # Qdrant or the embedding model, so no services or model downloads needed.
+      - name: Unit tests
+        run: cargo test --lib
+
+  e2e:
+    name: e2e (${{ matrix.os }})
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Cache embedding model
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/qorfinder/models
+          key: qorfinder-model-multilingual-e5-small
+
+
+
+      - name: Start Qdrant v1.19.0 (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p tools/qdrant
+          curl -fL -o /tmp/qdrant.tar.gz https://github.com/qdrant/qdrant/releases/download/v1.19.0/qdrant-x86_64-unknown-linux-musl.tar.gz
+          echo "9ec667456443463eee390e43cd36988af6b730c6db807b4e39f57c303d0264a3  /tmp/qdrant.tar.gz" | sha256sum -c -
+          tar -xzf /tmp/qdrant.tar.gz -C tools/qdrant
+          QDRANT__STORAGE__STORAGE_PATH=$PWD/tools/qdrant/storage nohup tools/qdrant/qdrant >/tmp/qdrant.log 2>&1 &
+          for i in $(seq 1 60); do curl -sf http://localhost:6333/healthz && break || sleep 1; done
+          curl -sf http://localhost:6333/healthz
+
+      - name: Start Qdrant v1.19.0 (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path tools\qdrant | Out-Null
+          $zip = "$env:TEMP\qdrant.zip"
+          Invoke-WebRequest -Uri "https://github.com/qdrant/qdrant/releases/download/v1.19.0/qdrant-x86_64-pc-windows-msvc.zip" -OutFile $zip
+          $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+          if ($hash -ne "980cb2e1ae771155cf211da8c0a8a9206b6482bd4effdc4db994d3adb707b087") { throw "sha256 mismatch: $hash" }
+          Expand-Archive -Path $zip -DestinationPath tools\qdrant -Force
+          $env:QDRANT__STORAGE__STORAGE_PATH = "$PWD\tools\qdrant\storage"
+          Start-Process -FilePath "$PWD\tools\qdrant\qdrant.exe" -WindowStyle Hidden
+          for ($i = 0; $i -lt 60; $i++) {
+            try { Invoke-RestMethod "http://localhost:6333/healthz" -TimeoutSec 2 | Out-Null; break }
+            catch { Start-Sleep -Seconds 1 }
+          }
+          Invoke-RestMethod "http://localhost:6333/healthz" | Out-Null
+
+      - name: Build (release)
+        run: cargo build --release
+
+      - name: Index small fixture
+        run: cargo run --release -- index tests/fixtures/small_corpus --once --collection e2e-fixture
+
+      - name: Search smoke test
+        shell: bash
+        run: cargo run --release -- query "database for vectors" --collection e2e-fixture | grep -i "qdrant"

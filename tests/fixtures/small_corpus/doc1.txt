@@ -1,0 +1,1 @@
+Rust is a multi-paradigm, general-purpose programming language. It emphasizes performance, type safety, and concurrency. It enforces memory safety—meaning that all references point to valid memory—without a garbage collector.

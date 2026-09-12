@@ -1,0 +1,11 @@
+pub mod chunker;
+pub mod cli;
+pub mod corpus;
+pub mod embedder;
+pub mod eval;
+pub mod format;
+pub mod indexer;
+pub mod parser;
+pub mod query;
+pub mod store;
+pub mod watcher;

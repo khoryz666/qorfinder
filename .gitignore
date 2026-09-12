@@ -1,0 +1,13 @@
+/target
+/data
+/tools
+qdrant_storage/
+.cache/
+.fastembed_cache/
+.env
+.DS_Store
+Thumbs.db
+*.log
+.direnv/
+result
+result-*
