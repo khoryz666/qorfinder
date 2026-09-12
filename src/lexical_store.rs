@@ -1,4 +1,5 @@
 use std::path::Path;
+use std::sync::Mutex;
 
 use anyhow::{Context, Result};
 use tantivy::collector::TopDocs;
@@ -39,7 +40,10 @@ struct Fields {
 /// every hit is ultimately resolved through here.
 pub struct LexicalStore {
     index: Index,
-    writer: IndexWriter,
+    // tantivy's IndexWriter::commit needs &mut self; everything else the
+    // writer exposes is already &self. Wrapping it is what lets the whole
+    // Store facade stay &self-based, matching Indexer's existing signatures.
+    writer: Mutex<IndexWriter>,
     reader: IndexReader,
     fields: Fields,
 }
@@ -88,7 +92,7 @@ impl LexicalStore {
 
         Ok(Self {
             index,
-            writer,
+            writer: Mutex::new(writer),
             reader,
             fields: Fields {
                 chunk_id,
@@ -105,7 +109,7 @@ impl LexicalStore {
     /// Stage an add for one chunk, replacing any existing document with the
     /// same `chunk_id`. Not visible to searches until `commit()`.
     pub fn upsert_chunk(
-        &mut self,
+        &self,
         chunk_id: &str,
         file_path: &str,
         chunk_index: u64,
@@ -114,8 +118,8 @@ impl LexicalStore {
         size_bytes: i64,
         vector_key: u64,
     ) -> Result<()> {
-        self.writer
-            .delete_term(Term::from_field_text(self.fields.chunk_id, chunk_id));
+        let writer = self.writer.lock().unwrap();
+        writer.delete_term(Term::from_field_text(self.fields.chunk_id, chunk_id));
         let mut doc = TantivyDocument::default();
         doc.add_text(self.fields.chunk_id, chunk_id);
         doc.add_text(self.fields.file_path, file_path);
@@ -124,24 +128,32 @@ impl LexicalStore {
         doc.add_i64(self.fields.mtime_secs, mtime_secs);
         doc.add_i64(self.fields.size_bytes, size_bytes);
         doc.add_u64(self.fields.vector_key, vector_key);
-        self.writer
+        writer
             .add_document(doc)
             .context("failed to add tantivy document")?;
         Ok(())
     }
 
-    pub fn delete_chunk(&mut self, chunk_id: &str) {
+    pub fn delete_chunk(&self, chunk_id: &str) {
         self.writer
+            .lock()
+            .unwrap()
             .delete_term(Term::from_field_text(self.fields.chunk_id, chunk_id));
     }
 
-    pub fn delete_file(&mut self, file_path: &str) {
+    pub fn delete_file(&self, file_path: &str) {
         self.writer
+            .lock()
+            .unwrap()
             .delete_term(Term::from_field_text(self.fields.file_path, file_path));
     }
 
-    pub fn commit(&mut self) -> Result<()> {
-        self.writer.commit().context("tantivy commit failed")?;
+    pub fn commit(&self) -> Result<()> {
+        self.writer
+            .lock()
+            .unwrap()
+            .commit()
+            .context("tantivy commit failed")?;
         self.reader.reload().context("tantivy reader reload failed")?;
         Ok(())
     }
@@ -215,7 +227,7 @@ mod tests {
     #[test]
     fn upsert_commit_search_roundtrips() {
         let dir = tempfile::tempdir().unwrap();
-        let mut s = store(dir.path());
+        let s = store(dir.path());
         s.upsert_chunk("a.txt:0", "a.txt", 0, "the quick brown fox", 1, 2, 10)
             .unwrap();
         s.commit().unwrap();
@@ -228,7 +240,7 @@ mod tests {
     #[test]
     fn upsert_same_chunk_id_replaces_not_duplicates() {
         let dir = tempfile::tempdir().unwrap();
-        let mut s = store(dir.path());
+        let s = store(dir.path());
         s.upsert_chunk("a.txt:0", "a.txt", 0, "original text", 1, 2, 10)
             .unwrap();
         s.commit().unwrap();
@@ -244,7 +256,7 @@ mod tests {
     #[test]
     fn delete_chunk_removes_it() {
         let dir = tempfile::tempdir().unwrap();
-        let mut s = store(dir.path());
+        let s = store(dir.path());
         s.upsert_chunk("a.txt:0", "a.txt", 0, "hello world", 1, 2, 10)
             .unwrap();
         s.commit().unwrap();
@@ -256,7 +268,7 @@ mod tests {
     #[test]
     fn delete_file_removes_all_its_chunks() {
         let dir = tempfile::tempdir().unwrap();
-        let mut s = store(dir.path());
+        let s = store(dir.path());
         s.upsert_chunk("a.txt:0", "a.txt", 0, "hello world", 1, 2, 10)
             .unwrap();
         s.upsert_chunk("a.txt:1", "a.txt", 1, "hello again", 1, 2, 11)
@@ -274,7 +286,7 @@ mod tests {
     #[test]
     fn resolve_vector_key_finds_chunk() {
         let dir = tempfile::tempdir().unwrap();
-        let mut s = store(dir.path());
+        let s = store(dir.path());
         s.upsert_chunk("a.txt:0", "a.txt", 0, "hello world", 1, 2, 42)
             .unwrap();
         s.commit().unwrap();
@@ -294,7 +306,7 @@ mod tests {
     fn reopening_existing_index_preserves_documents() {
         let dir = tempfile::tempdir().unwrap();
         {
-            let mut s = store(dir.path());
+            let s = store(dir.path());
             s.upsert_chunk("a.txt:0", "a.txt", 0, "persisted text", 1, 2, 10)
                 .unwrap();
             s.commit().unwrap();

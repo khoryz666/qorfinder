@@ -90,6 +90,35 @@ impl FingerprintStore {
         Ok(())
     }
 
+    /// Apply many sets/deletes (`None` = delete) in a single transaction.
+    /// Used by the Store facade to flush pending fingerprint updates only
+    /// after the corresponding lexical/vector writes are already durable —
+    /// so a crash never leaves a fingerprint marked "done" for data that
+    /// wasn't actually persisted.
+    pub fn apply_many(&self, updates: &HashMap<String, Option<FingerprintRecord>>) -> Result<()> {
+        if updates.is_empty() {
+            return Ok(());
+        }
+        let write_txn = self.db.begin_write()?;
+        {
+            let mut table = write_txn.open_table(TABLE)?;
+            for (file_path, update) in updates {
+                match update {
+                    Some(record) => {
+                        let bytes = serde_json::to_vec(record)
+                            .context("failed to encode fingerprint record")?;
+                        table.insert(file_path.as_str(), bytes.as_slice())?;
+                    }
+                    None => {
+                        table.remove(file_path.as_str())?;
+                    }
+                }
+            }
+        }
+        write_txn.commit()?;
+        Ok(())
+    }
+
     /// Every known file's fingerprint. Replaces the old Qdrant-backed
     /// `Store::file_fingerprints()`'s full-collection scroll with an O(files)
     /// table iteration.
@@ -143,6 +172,19 @@ mod tests {
         store.set("/a.txt", &rec(1, 1, 1, &[9])).unwrap();
         store.delete("/a.txt").unwrap();
         assert_eq!(store.get("/a.txt").unwrap(), None);
+    }
+
+    #[test]
+    fn apply_many_sets_and_deletes_in_one_transaction() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = FingerprintStore::open(&dir.path().join("fp.redb")).unwrap();
+        store.set("/a.txt", &rec(1, 1, 1, &[1])).unwrap();
+        let mut updates = HashMap::new();
+        updates.insert("/a.txt".to_string(), None);
+        updates.insert("/b.txt".to_string(), Some(rec(2, 2, 2, &[2])));
+        store.apply_many(&updates).unwrap();
+        assert_eq!(store.get("/a.txt").unwrap(), None);
+        assert_eq!(store.get("/b.txt").unwrap(), Some(rec(2, 2, 2, &[2])));
     }
 
     #[test]
