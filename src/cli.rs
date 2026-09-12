@@ -7,22 +7,19 @@ use clap::{Parser, Subcommand};
 
 use crate::embedder::Embedder;
 use crate::indexer::Indexer;
-use crate::store::{DEFAULT_COLLECTION, DEFAULT_URL, Store};
+use crate::store::Store;
 
 #[derive(Parser)]
 #[command(
     name = "qorfinder",
     version,
-    about = "Local-first semantic search: index a directory into Qdrant and query it with sentence embeddings"
+    about = "Local-first semantic search: index a directory into an embedded hybrid store and query it with sentence embeddings"
 )]
 pub struct Cli {
-    /// Qdrant server URL
-    #[arg(long, global = true, env = "QORFINDER_QDRANT_URL", default_value = DEFAULT_URL)]
-    qdrant: String,
-
-    /// Qdrant collection name
-    #[arg(long, global = true, env = "QORFINDER_COLLECTION", default_value = DEFAULT_COLLECTION)]
-    collection: String,
+    /// Directory holding the embedded index (tantivy + usearch + redb).
+    /// Defaults to ~/.cache/qorfinder/indexes/default
+    #[arg(long, global = true, env = "QORFINDER_INDEX_DIR")]
+    index_dir: Option<PathBuf>,
 
     /// Directory where the embedding model is cached
     #[arg(long, global = true, env = "QORFINDER_MODEL_CACHE")]
@@ -30,6 +27,15 @@ pub struct Cli {
 
     #[command(subcommand)]
     command: Command,
+}
+
+/// Stable per-user default index location: `~/.cache/qorfinder/indexes/default`.
+fn default_index_dir() -> PathBuf {
+    let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+    home.join(".cache")
+        .join("qorfinder")
+        .join("indexes")
+        .join(crate::store::DEFAULT_INDEX_DIR_NAME)
 }
 
 #[derive(Subcommand)]
@@ -145,14 +151,13 @@ async fn execute(cli: Cli) -> Result<()> {
 
     let embedder =
         Embedder::try_new(cli.model_cache.clone()).context("failed to load embedding model")?;
-    let store = Store::connect(&cli.qdrant, &cli.collection, embedder.dims())
-        .await
-        .with_context(|| {
-            format!(
-                "failed to connect to Qdrant at {} (is it running?)",
-                cli.qdrant
-            )
-        })?;
+    let index_dir = cli.index_dir.clone().unwrap_or_else(default_index_dir);
+    let store = Store::open(&index_dir, embedder.dims()).with_context(|| {
+        format!(
+            "failed to open index at {} (delete it to rebuild from scratch)",
+            index_dir.display()
+        )
+    })?;
 
     match cli.command {
         Command::Index {
@@ -186,16 +191,15 @@ async fn execute(cli: Cli) -> Result<()> {
         }
         Command::Query { query, top_k } => {
             let started = Instant::now();
-            let vector = embedder.embed_query(&query)?;
-            let hits = store.search(vector, top_k).await?;
+            let hits = crate::query::run_query(&store, &embedder, &query, top_k)?;
             print!(
                 "{}",
                 crate::format::format_hits(&query, &hits, started.elapsed())
             );
         }
         Command::Stats => {
-            let count = store.count().await?;
-            println!("collection '{}': {} point(s)", cli.collection, count);
+            let count = store.count()?;
+            println!("index '{}': {} chunk(s)", index_dir.display(), count);
         }
         Command::Eval {
             corpus,
@@ -205,8 +209,7 @@ async fn execute(cli: Cli) -> Result<()> {
             limit,
         } => {
             let report =
-                crate::eval::run_eval(&store, &embedder, &corpus, &queries, &qrels, top_k, limit)
-                    .await?;
+                crate::eval::run_eval(&store, &embedder, &corpus, &queries, &qrels, top_k, limit)?;
             println!(
                 "queries evaluated: {} (skipped, no qrels: {})",
                 report.evaluated, report.skipped_no_qrels

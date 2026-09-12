@@ -20,20 +20,9 @@ pub struct FingerprintRecord {
 
 impl FingerprintRecord {
     pub fn matches(&self, meta: &std::fs::Metadata) -> bool {
-        let (mtime, size) = file_fingerprint(meta);
+        let (mtime, size) = super::file_fingerprint(meta);
         self.mtime_secs == mtime && self.size_bytes == size
     }
-}
-
-/// (mtime seconds, size bytes) fingerprint of a file on disk.
-pub fn file_fingerprint(meta: &std::fs::Metadata) -> (i64, i64) {
-    let secs = meta
-        .modified()
-        .ok()
-        .and_then(|m| m.duration_since(std::time::UNIX_EPOCH).ok())
-        .map(|d| d.as_secs() as i64)
-        .unwrap_or(0);
-    (secs, meta.len() as i64)
 }
 
 /// Embedded key-value side-table (redb) mapping canonical file path -> its
@@ -67,27 +56,6 @@ impl FingerprintStore {
             }
             None => Ok(None),
         }
-    }
-
-    pub fn set(&self, file_path: &str, record: &FingerprintRecord) -> Result<()> {
-        let bytes = serde_json::to_vec(record).context("failed to encode fingerprint record")?;
-        let write_txn = self.db.begin_write()?;
-        {
-            let mut table = write_txn.open_table(TABLE)?;
-            table.insert(file_path, bytes.as_slice())?;
-        }
-        write_txn.commit()?;
-        Ok(())
-    }
-
-    pub fn delete(&self, file_path: &str) -> Result<()> {
-        let write_txn = self.db.begin_write()?;
-        {
-            let mut table = write_txn.open_table(TABLE)?;
-            table.remove(file_path)?;
-        }
-        write_txn.commit()?;
-        Ok(())
     }
 
     /// Apply many sets/deletes (`None` = delete) in a single transaction.
@@ -149,12 +117,18 @@ mod tests {
         }
     }
 
+    fn put(store: &FingerprintStore, file_path: &str, record: FingerprintRecord) {
+        let mut updates = HashMap::new();
+        updates.insert(file_path.to_string(), Some(record));
+        store.apply_many(&updates).unwrap();
+    }
+
     #[test]
     fn set_then_get_roundtrips() {
         let dir = tempfile::tempdir().unwrap();
         let store = FingerprintStore::open(&dir.path().join("fp.redb")).unwrap();
         let record = rec(100, 50, 3, &[1, 2, 3]);
-        store.set("/a.txt", &record).unwrap();
+        put(&store, "/a.txt", record.clone());
         assert_eq!(store.get("/a.txt").unwrap(), Some(record));
     }
 
@@ -166,19 +140,10 @@ mod tests {
     }
 
     #[test]
-    fn delete_removes_entry() {
-        let dir = tempfile::tempdir().unwrap();
-        let store = FingerprintStore::open(&dir.path().join("fp.redb")).unwrap();
-        store.set("/a.txt", &rec(1, 1, 1, &[9])).unwrap();
-        store.delete("/a.txt").unwrap();
-        assert_eq!(store.get("/a.txt").unwrap(), None);
-    }
-
-    #[test]
     fn apply_many_sets_and_deletes_in_one_transaction() {
         let dir = tempfile::tempdir().unwrap();
         let store = FingerprintStore::open(&dir.path().join("fp.redb")).unwrap();
-        store.set("/a.txt", &rec(1, 1, 1, &[1])).unwrap();
+        put(&store, "/a.txt", rec(1, 1, 1, &[1]));
         let mut updates = HashMap::new();
         updates.insert("/a.txt".to_string(), None);
         updates.insert("/b.txt".to_string(), Some(rec(2, 2, 2, &[2])));
@@ -191,8 +156,8 @@ mod tests {
     fn all_returns_every_entry() {
         let dir = tempfile::tempdir().unwrap();
         let store = FingerprintStore::open(&dir.path().join("fp.redb")).unwrap();
-        store.set("/a.txt", &rec(1, 1, 1, &[1])).unwrap();
-        store.set("/b.txt", &rec(2, 2, 2, &[2, 3])).unwrap();
+        put(&store, "/a.txt", rec(1, 1, 1, &[1]));
+        put(&store, "/b.txt", rec(2, 2, 2, &[2, 3]));
         let all = store.all().unwrap();
         assert_eq!(all.len(), 2);
         assert_eq!(all["/b.txt"].vector_keys, vec![2, 3]);
@@ -204,7 +169,7 @@ mod tests {
         let path = dir.path().join("fp.redb");
         {
             let store = FingerprintStore::open(&path).unwrap();
-            store.set("/a.txt", &rec(1, 1, 1, &[1])).unwrap();
+            put(&store, "/a.txt", rec(1, 1, 1, &[1]));
         }
         let store = FingerprintStore::open(&path).unwrap();
         assert!(store.get("/a.txt").unwrap().is_some());

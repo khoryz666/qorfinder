@@ -19,6 +19,7 @@ pub struct LexicalHit {
 /// A chunk resolved by its usearch vector key, for the dense side of a
 /// hybrid query.
 pub struct ResolvedChunk {
+    pub chunk_id: String,
     pub file_path: String,
     pub chunk_index: u64,
     pub text: String,
@@ -134,13 +135,6 @@ impl LexicalStore {
         Ok(())
     }
 
-    pub fn delete_chunk(&self, chunk_id: &str) {
-        self.writer
-            .lock()
-            .unwrap()
-            .delete_term(Term::from_field_text(self.fields.chunk_id, chunk_id));
-    }
-
     pub fn delete_file(&self, file_path: &str) {
         self.writer
             .lock()
@@ -195,6 +189,7 @@ impl LexicalStore {
             Some((_, addr)) => {
                 let doc: TantivyDocument = searcher.doc(addr)?;
                 Ok(Some(ResolvedChunk {
+                    chunk_id: self.get_text(&doc, self.fields.chunk_id),
                     file_path: self.get_text(&doc, self.fields.file_path),
                     chunk_index: self.get_u64(&doc, self.fields.chunk_index),
                     text: self.get_text(&doc, self.fields.text),
@@ -251,18 +246,6 @@ mod tests {
         assert_eq!(hits.len(), 1);
         assert_eq!(hits[0].text, "updated text");
         assert!(s.search("original", 5).unwrap().is_empty());
-    }
-
-    #[test]
-    fn delete_chunk_removes_it() {
-        let dir = tempfile::tempdir().unwrap();
-        let s = store(dir.path());
-        s.upsert_chunk("a.txt:0", "a.txt", 0, "hello world", 1, 2, 10)
-            .unwrap();
-        s.commit().unwrap();
-        s.delete_chunk("a.txt:0");
-        s.commit().unwrap();
-        assert!(s.search("hello", 5).unwrap().is_empty());
     }
 
     #[test]

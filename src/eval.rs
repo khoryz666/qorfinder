@@ -180,7 +180,7 @@ pub fn build_doc_map(corpus: &Path) -> HashMap<String, String> {
 /// The corpus must already be indexed. Queries without qrels are skipped
 /// (BEIR ships train + test queries together); `limit` caps the number of
 /// *judged* queries that are actually embedded and searched.
-pub async fn run_eval(
+pub fn run_eval(
     store: &Store,
     embedder: &Embedder,
     corpus: &Path,
@@ -209,7 +209,7 @@ pub async fn run_eval(
             continue;
         };
         let vector = embedder.embed_query(query)?;
-        let hits = store.search(vector, k as u64).await?;
+        let hits = store.search(vector, k as u64)?;
         let ranked: Vec<String> = dedupe(
             hits.iter()
                 .filter_map(|h| doc_map.get(&h.file_path).cloned())

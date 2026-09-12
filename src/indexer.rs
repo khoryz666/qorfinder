@@ -12,7 +12,9 @@ use crate::parser::{is_supported, parse_file};
 use crate::store::{Store, file_fingerprint};
 
 /// Chunks embedded per model call (fastembed splits each call into its own
-/// parallel sub-batches internally).
+/// parallel sub-batches internally). Embedding batches may span multiple
+/// files; `Store::stage_chunk` accumulates a file's chunks incrementally so
+/// that's safe regardless of where a batch boundary falls.
 const EMBED_BATCH: usize = 256;
 
 #[derive(Debug, Default)]
@@ -49,10 +51,11 @@ impl Indexer {
     }
 
     /// Walk `root` and index every supported file. Files whose (mtime, size)
-    /// match the points already in the store are skipped, so re-running the
-    /// command only re-embeds what actually changed. Points of files that no
-    /// longer exist under `root` are removed. Parsing/chunking runs on a
-    /// rayon pool, embeddings and upserts are batched.
+    /// match the fingerprint already stored are skipped, so re-running the
+    /// command only re-embeds what actually changed. Fingerprints of files
+    /// that no longer exist under `root` are removed. Parsing/chunking runs
+    /// on a rayon pool, embeddings run in batches; the whole scan commits
+    /// once at the end (no network round trips to amortize per-batch).
     pub async fn index_dir(&self, root: &Path, force: bool) -> Result<DirStats> {
         let started = Instant::now();
         let mut stats = DirStats::default();
@@ -88,11 +91,12 @@ impl Indexer {
         let fingerprints = if force {
             HashMap::new()
         } else {
-            self.store.file_fingerprints().await?
+            self.store.file_fingerprints()?
         };
 
-        // Remove points of files that vanished from disk (restricted to paths
-        // under `root`, so other directories in the same collection survive).
+        // Remove fingerprints of files that vanished from disk (restricted
+        // to paths under `root`, so other directories in the same index
+        // survive).
         if !force {
             let known: HashSet<&str> = files.iter().filter_map(|p| p.to_str()).collect();
             for path_str in fingerprints.keys() {
@@ -101,7 +105,7 @@ impl Indexer {
                 }
                 let path = Path::new(path_str);
                 if path.starts_with(root) {
-                    if let Err(err) = self.store.delete_file(path).await {
+                    if let Err(err) = self.store.delete_file(path) {
                         tracing::warn!("failed to remove vanished file {path_str}: {err:#}");
                     } else {
                         stats.removed += 1;
@@ -161,21 +165,16 @@ impl Indexer {
             }
         }
 
-        // Remove stale points of changed files via deterministic IDs (no scan).
+        // Clear old chunks before staging new ones for changed files, and
+        // remove emptied files outright.
         for (path, _) in &changed {
-            if let Some(count) = fingerprints
-                .get(&path.display().to_string())
-                .and_then(|fp| fp.chunk_count)
-            {
-                self.store.delete_file_ids(path, count).await?;
-            }
+            self.store.delete_file(path)?;
         }
         for path in &emptied {
-            self.store.delete_file(path).await?;
+            self.store.delete_file(path)?;
         }
 
-        // Embed in big batches and upsert as we go; only the last request
-        // waits for durability.
+        // Embed in big batches (spanning files) and stage as we go.
         let total_chunks: usize = changed.iter().map(|(_, c)| c.len()).sum();
         let file_fps: HashMap<&Path, (i64, i64)> = changed
             .iter()
@@ -188,7 +187,6 @@ impl Indexer {
             .collect();
         let mut texts: Vec<&str> = Vec::with_capacity(EMBED_BATCH);
         let mut refs: Vec<(&Path, u64)> = Vec::with_capacity(EMBED_BATCH);
-        let mut embedded = 0usize;
         for (path, chunks) in &changed {
             for (i, chunk) in chunks.iter().enumerate() {
                 texts.push(chunk.as_str());
@@ -199,14 +197,7 @@ impl Indexer {
                         .map(str::to_string)
                         .collect();
                     let batch_refs: Vec<(&Path, u64)> = std::mem::take(&mut refs);
-                    embedded += batch_texts.len();
-                    self.embed_and_upsert(
-                        &batch_refs,
-                        &batch_texts,
-                        &file_fps,
-                        embedded == total_chunks,
-                    )
-                    .await?;
+                    self.embed_and_stage(&batch_refs, &batch_texts, &file_fps)?;
                 }
             }
         }
@@ -216,9 +207,10 @@ impl Indexer {
                 .map(str::to_string)
                 .collect();
             let batch_refs: Vec<(&Path, u64)> = std::mem::take(&mut refs);
-            self.embed_and_upsert(&batch_refs, &batch_texts, &file_fps, true)
-                .await?;
+            self.embed_and_stage(&batch_refs, &batch_texts, &file_fps)?;
         }
+
+        self.store.commit()?;
 
         tracing::info!(
             "indexed {} file(s) ({} chunks), {} unchanged, {} removed, {} skipped, {} failed in {:?}",
@@ -233,37 +225,31 @@ impl Indexer {
         Ok(stats)
     }
 
-    /// Embed `texts` and upsert the resulting points in batches.
-    async fn embed_and_upsert(
+    /// Embed `texts` and stage the resulting chunks (uncommitted).
+    fn embed_and_stage(
         &self,
         refs: &[(&Path, u64)],
         texts: &[String],
         file_fps: &HashMap<&Path, (i64, i64)>,
-        wait: bool,
     ) -> Result<()> {
         let vectors = self.embedder.embed_passages(texts)?;
-        let points: Vec<_> = refs
-            .iter()
-            .zip(texts)
-            .zip(vectors)
-            .map(|(((path, chunk_index), text), vector)| {
-                let fp = file_fps.get(path).copied().unwrap_or((0, 0));
-                Store::point(&path.display().to_string(), *chunk_index, text, vector, fp)
-            })
-            .collect();
-        self.store.upsert_points(points, wait).await?;
+        for (((path, chunk_index), text), vector) in refs.iter().zip(texts).zip(vectors) {
+            let fp = file_fps.get(path).copied().unwrap_or((0, 0));
+            self.store.stage_chunk(path, *chunk_index, text, &vector, fp)?;
+        }
         Ok(())
     }
 
-    /// Parse, chunk, embed and upsert a single file. Skips the file when its
-    /// (mtime, size) matches the points already stored; replaces any existing
-    /// points otherwise.
+    /// Parse, chunk, embed and stage a single file, then commit immediately
+    /// (interactive freshness matters more than throughput for watch mode).
+    /// Skips the file when its (mtime, size) matches what's already stored;
+    /// replaces any existing chunks otherwise.
     pub async fn index_file(&self, path: &Path) -> Result<()> {
         let started = Instant::now();
         let meta = std::fs::metadata(path)
             .with_context(|| format!("failed to stat {}", path.display()))?;
-        let old = self.store.file_info(path).await?;
-        if old.matches(&meta) {
+        let old = self.store.file_info(path)?;
+        if old.as_ref().is_some_and(|fp| fp.matches(&meta)) {
             tracing::debug!("unchanged, skipping {}", path.display());
             return Ok(());
         }
@@ -274,17 +260,19 @@ impl Indexer {
             return Ok(());
         }
         let chunks = chunk_text(&text, self.chunk_size, self.overlap);
-        let mut vectors = Vec::with_capacity(chunks.len());
-        for chunk_batch in chunks.chunks(EMBED_BATCH) {
-            let batch_vectors = self.embedder.embed_passages(chunk_batch)?;
-            vectors.extend(batch_vectors);
+        let fp = file_fingerprint(&meta);
+        self.store.delete_file(path)?;
+        for start in (0..chunks.len()).step_by(EMBED_BATCH) {
+            let end = (start + EMBED_BATCH).min(chunks.len());
+            let batch = &chunks[start..end];
+            let vectors = self.embedder.embed_passages(batch)?;
+            for (offset, vector) in vectors.into_iter().enumerate() {
+                let chunk_index = (start + offset) as u64;
+                self.store
+                    .stage_chunk(path, chunk_index, &batch[offset], &vector, fp)?;
+            }
         }
-        if let Some(count) = old.chunk_count {
-            self.store.delete_file_ids(path, count).await?;
-        }
-        self.store
-            .upsert_chunks(path, &chunks, &vectors, file_fingerprint(&meta))
-            .await?;
+        self.store.commit()?;
         tracing::info!(
             "indexed {} ({} chunks) in {:?}",
             path.display(),
@@ -294,16 +282,18 @@ impl Indexer {
         Ok(())
     }
 
-    /// Remove every point belonging to `path` from the store.
+    /// Remove every chunk belonging to `path` from the store and commit.
     pub async fn delete_file(&self, path: &Path) -> Result<()> {
-        self.store.delete_file(path).await
+        self.store.delete_file(path)?;
+        self.store.commit()?;
+        Ok(())
     }
 }
 
-/// Resolve `path` to an absolute, canonical path used as the payload identity.
-/// Falls back to canonicalizing the parent directory so deleted files can
-/// still be matched against their indexed identity. Uses `dunce` so Windows
-/// paths don't carry the `\\?\` verbatim prefix.
+/// Resolve `path` to an absolute, canonical path used as the identity for
+/// store lookups. Falls back to canonicalizing the parent directory so
+/// deleted files can still be matched against their indexed identity. Uses
+/// `dunce` so Windows paths don't carry the `\\?\` verbatim prefix.
 pub fn canonical_identity(path: &Path) -> Option<PathBuf> {
     if let Ok(canonical) = dunce::canonicalize(path) {
         return Some(canonical);

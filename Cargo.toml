@@ -23,7 +23,6 @@ fastembed = "4"
 lopdf = "0.36"
 md-5 = "0.10"
 notify = "8"
-qdrant-client = "1"
 rayon = "1"
 serde_json = "1"
 sha2 = "0.10"
@@ -32,7 +31,6 @@ tokio = { version = "1", features = ["full"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 ureq = "2"
-uuid = { version = "1", features = ["v5"] }
 walkdir = "2"
 zip = "8"
 tantivy = "0.26.2"
