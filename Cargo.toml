@@ -35,6 +35,10 @@ ureq = "2"
 uuid = { version = "1", features = ["v5"] }
 walkdir = "2"
 zip = "8"
+tantivy = "0.26.2"
+usearch = "2.26.2"
+redb = "4.2.0"
+serde = { version = "1.0.229", features = ["derive"] }
 
 [dev-dependencies]
 tempfile = "3"
