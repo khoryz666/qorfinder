@@ -101,7 +101,7 @@ enum Command {
         #[command(subcommand)]
         corpus: CorpusKind,
     },
-    /// Download the embedding model and print its info (no Qdrant needed)
+    /// Download the embedding model and print its info
     Warm,
 }
 

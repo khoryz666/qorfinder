@@ -2,7 +2,7 @@
 name = "qorfinder"
 version = "0.1.0"
 edition = "2024"
-description = "Local-first semantic search CLI: index files into Qdrant, query with sentence embeddings"
+description = "Local-first semantic search CLI: embedded hybrid (BM25 + vector) search over local files"
 license = "MIT"
 
 [lib]
