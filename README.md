@@ -23,7 +23,7 @@ cargo build --release
 
 - First run downloads the ONNX embedding model (~120 MB) into `~/.cache/qorfinder/models`; everything after that is offline.
 - The index lives under `~/.cache/qorfinder/indexes/default` by default (override with `--index-dir` or `QORFINDER_INDEX_DIR`).
-- Supported file types: `txt`, `md`, `markdown`, `pdf`, `docx`.
+- Supported file types: `txt`, `md`, `markdown`, `pdf`, `docx`. Files over 50 MB are skipped.
 
 ## Develop
 

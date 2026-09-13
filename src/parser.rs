@@ -1,6 +1,12 @@
 use std::io::Read;
 use std::path::Path;
 
+/// Files larger than this are skipped rather than fully loaded into memory —
+/// a personal document corpus has no legitimate use for a single file this
+/// large, and every parser here (`read_to_string`, `lopdf::Document::load`,
+/// `read_to_end`) buffers the whole file up front.
+const MAX_FILE_SIZE_BYTES: u64 = 50 * 1024 * 1024;
+
 #[derive(Debug, thiserror::Error)]
 pub enum ParseError {
     #[error("unsupported file type: {0}")]
@@ -13,6 +19,8 @@ pub enum ParseError {
     },
     #[error("failed to parse {path}: {message}")]
     Format { path: String, message: String },
+    #[error("{path} is {size} bytes, over the {limit} byte limit")]
+    TooLarge { path: String, size: u64, limit: u64 },
 }
 
 pub fn is_supported(path: &Path) -> bool {
@@ -26,6 +34,17 @@ pub fn is_supported(path: &Path) -> bool {
 }
 
 pub fn parse_file(path: &Path) -> Result<String, ParseError> {
+    let meta = std::fs::metadata(path).map_err(|source| ParseError::Io {
+        path: path.display().to_string(),
+        source,
+    })?;
+    if meta.len() > MAX_FILE_SIZE_BYTES {
+        return Err(ParseError::TooLarge {
+            path: path.display().to_string(),
+            size: meta.len(),
+            limit: MAX_FILE_SIZE_BYTES,
+        });
+    }
     let ext = path
         .extension()
         .and_then(|e| e.to_str())
@@ -139,5 +158,19 @@ mod tests {
     fn missing_file_is_io_error() {
         let path = Path::new("/nonexistent/qorfinder/nope.txt");
         assert!(matches!(parse_file(path), Err(ParseError::Io { .. })));
+    }
+
+    #[test]
+    fn rejects_file_over_size_limit() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("huge.txt");
+        // A sparse file reports the target length without writing that much
+        // data, so this stays fast regardless of the limit's size.
+        let file = std::fs::File::create(&path).unwrap();
+        file.set_len(MAX_FILE_SIZE_BYTES + 1).unwrap();
+        assert!(matches!(
+            parse_file(&path),
+            Err(ParseError::TooLarge { .. })
+        ));
     }
 }
