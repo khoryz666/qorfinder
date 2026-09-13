@@ -19,17 +19,18 @@ The gap QorFinder targets: OS-native and keyword tools have no semantic understa
 
 Standard IR literature (and QorFinder's own architecture rationale, see `src/query.rs`) is that hybrid lexical+dense retrieval matches or beats dense-only retrieval, because the two sides fail in complementary ways: embeddings blur exact terms/codes/names that keyword search catches, and keyword search misses paraphrases/synonyms that embeddings catch. Reciprocal Rank Fusion combines both without needing either side to "win" a scoring calibration.
 
-**Measured baseline** (previous, dense-only architecture — Qdrant-backed, `intfloat/multilingual-e5-small`, BEIR SciFact, 300 queries):
+**Measured** (current embedded architecture — tantivy + usearch + redb, `intfloat/multilingual-e5-small`, BEIR SciFact corpus, 5,183 documents, 300 judged queries):
 
-| Metric | Score |
-|---|---|
-| nDCG@10 | 0.6234 |
-| Recall@10 | 0.7281 |
-| MRR@10 | 0.5975 |
-| Query latency | ~230 ms/query (Quran corpus, 6,236 files) |
-| Index storage | ~139 MB (Quran corpus via Qdrant's on-disk HNSW format) |
+| Metric | Dense only | Lexical only | Hybrid (RRF) | Previous dense-only baseline (Qdrant-backed) |
+|---|---|---|---|---|
+| nDCG@10 | 0.6237 | 0.6193 | **0.6654** | 0.6234 |
+| Recall@10 | 0.7283 | 0.7325 | **0.7877** | 0.7281 |
+| MRR@10 | 0.5972 | 0.5898 | **0.6338** | 0.5975 |
+| Query latency | 11.9 ms/query | 0.6 ms/query | 13.1 ms/query | ~230 ms/query (Quran corpus, 6,236 files) |
 
-This repo's `eval.rs` now supports `--mode dense|lexical|hybrid` specifically so this comparison can be re-run against the current embedded hybrid store on the same SciFact benchmark — that re-run is the next step (see below) and its hybrid-mode numbers are intentionally not fabricated here; they should be measured, not guessed.
+Hybrid beats both single-mode retrieval paths on every metric (+0.042 nDCG, +0.059 Recall, +0.037 MRR over dense alone), confirming the rebuild's core architectural claim. The new dense-only path also reproduces the old Qdrant-backed baseline almost exactly (0.6237 vs. 0.6234 nDCG) — expected, since the retrieval math is unchanged and only the storage backend moved — and does so roughly 19x faster per query (11.9 ms vs. ~230 ms), consistent with removing the gRPC round trip to a separate server.
+
+Index storage for this SciFact index (5,183 docs) is 48 MB (15 MB tantivy + 31 MB usearch + 2 MB redb) — smaller than the ~139 MB Qdrant baseline for a similarly-sized corpus (Quran, 6,236 docs), though the two aren't the same corpus so this is a directional comparison, not a controlled one.
 
 ## Resource footprint: embedded vs. server-backed
 
@@ -57,11 +58,6 @@ cargo run --release -- --index-dir /tmp/scifact-index eval \
   data/scifact/corpus data/scifact/queries.tsv data/scifact/qrels.tsv --mode hybrid
 ```
 
-Each run prints nDCG@10, Recall@10, MRR@10, and per-query latency. Filling in this section's hybrid-vs-dense-vs-lexical table with a real run on the SciFact and Quran corpora is the next step for validating the rebuild's core claim (hybrid at least matches dense-only) — it was not completed as part of this pass. The pipeline itself (indexing, querying, all three retrieval modes) is verified working end to end against the repo's small fixture corpus (`tests/fixtures/small_corpus`) and is not a code issue; the full 5,183-document SciFact run was blocked by an environment problem, diagnosed as follows:
+Each run prints nDCG@10, Recall@10, MRR@10, and per-query latency; the numbers above are from this exact run against the full SciFact corpus (5,183 documents), indexed once and then evaluated in each mode against that same index.
 
-- `dmesg` on the dev machine's WSL instance shows its root filesystem (`ext4` on `/dev/sdd`) unmounting and remounting on a roughly 100-125 second cycle, continuously, independent of workload — each remount logs "corrupted or uncleanly shut down," i.e. an abrupt disconnect, not a clean unmount.
-- A plain `sleep 150` with zero CPU/memory load was killed before completing, ruling out compute load as the cause.
-- A fully detached process (`setsid` + `disown`, redirected away from the invoking shell) was *also* killed with no trace — ruling out "the invoking command's own timeout" as the cause, since a properly detached child should survive that.
-- Together these point to the whole VM being interrupted at a fixed short cadence (possibly a host-level snapshot/pause, antivirus locking the WSL virtual disk, or similar), not anything specific to this codebase or to Rust/cargo's resource usage.
-
-Any single operation that needs more than ~100 seconds of uninterrupted wall time — indexing 5,183 documents' embeddings included — is therefore unreliable on this specific machine until that's addressed. The reproduction commands above work correctly on a stable environment (verified against the small fixture corpus, which completes in well under that window).
+The first attempt at this run was killed by the Linux OOM killer partway through indexing — not the VM-instability issue previously documented in this section (that was re-tested separately with a clean, uninterrupted 130-second `sleep` and did not reproduce, so it appears to have been transient to that earlier environment). `dmesg` showed the `qorfinder` process reaching several GB of resident memory before being killed. The cause: `indexer.rs` batched 256 chunks per embedding call (matching `fastembed`'s own default), and CPU transformer self-attention holds activations for the whole batch at once — memory that scales with `batch_size x sequence_length^2`. On this 384-dim/512-token model that meant 6-7 GB resident for a single batch, comfortably enough to OOM-kill an 8 GB machine. Lowering `EMBED_BATCH` to 32 (the conventional CPU sentence-embedding batch size) cut peak resident memory to ~1.9 GB for both a 1,000-document subset and the full 5,183-document corpus — confirming the memory ceiling is set by batch size, not corpus size — and the full run then completed cleanly in 14m8s.
