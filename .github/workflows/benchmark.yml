@@ -1,0 +1,63 @@
+name: Benchmark
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Weekly, Monday 06:00 UTC — catches retrieval-quality regressions
+    # without slowing down every push/PR (a full SciFact run takes ~15 min).
+    - cron: "0 6 * * 1"
+
+jobs:
+  scifact:
+    name: scifact
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v27
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Cache cargo artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Cache embedding model
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/qorfinder/models
+          key: qorfinder-model-multilingual-e5-small
+
+      - name: Cache SciFact corpus
+        uses: actions/cache@v4
+        with:
+          path: data
+          key: qorfinder-scifact-corpus-v1
+
+      - name: Build (release)
+        run: nix develop --command cargo build --release
+
+      - name: Prepare SciFact corpus
+        run: nix develop --command ./target/release/qorfinder corpus beir scifact --out data
+
+      - name: Index SciFact corpus
+        run: nix develop --command ./target/release/qorfinder --index-dir /tmp/scifact-index index data/scifact/corpus --once
+
+      - name: Evaluate dense, lexical, hybrid
+        run: |
+          set -e
+          for mode in dense lexical hybrid; do
+            echo "### $mode" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            nix develop --command ./target/release/qorfinder --index-dir /tmp/scifact-index eval \
+              data/scifact/corpus data/scifact/queries.tsv data/scifact/qrels.tsv --mode "$mode" \
+              | tee /tmp/eval-$mode.txt | tee -a "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          done
+
+      - name: Regression gate (hybrid nDCG@10)
+        run: |
+          ndcg=$(grep -oP 'nDCG@10:\s*\K[0-9.]+' /tmp/eval-hybrid.txt)
+          echo "hybrid nDCG@10 = $ndcg (floor: 0.55, measured baseline: 0.6654)"
+          awk -v v="$ndcg" 'BEGIN { exit !(v >= 0.55) }'
