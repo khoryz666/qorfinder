@@ -1,8 +1,10 @@
 use std::collections::{HashMap, HashSet};
+use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use anyhow::{Context, Result};
+use indicatif::{ParallelProgressIterator, ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 use walkdir::WalkDir;
 
@@ -38,6 +40,24 @@ enum FileOutcome {
     Empty,
     Changed(Vec<String>),
     Failed,
+}
+
+/// A progress bar for `label`, or a no-op one when stderr isn't a terminal
+/// (piped output, CI logs) so redirected/non-interactive runs stay clean.
+fn progress_bar(len: u64, label: &str) -> ProgressBar {
+    if len == 0 || !std::io::stderr().is_terminal() {
+        return ProgressBar::hidden();
+    }
+    let bar = ProgressBar::new(len);
+    bar.set_style(
+        ProgressStyle::with_template(
+            "{msg} [{elapsed_precise}] [{bar:32}] {pos}/{len} (eta {eta})",
+        )
+        .unwrap()
+        .progress_chars("=> "),
+    );
+    bar.set_message(label.to_string());
+    bar
 }
 
 impl Indexer {
@@ -127,8 +147,10 @@ impl Indexer {
         }
 
         // Parse + chunk in parallel; skip files whose fingerprint is current.
+        let scan_progress = progress_bar(files.len() as u64, "scanning");
         let outcomes: Vec<(PathBuf, FileOutcome)> = files
             .into_par_iter()
+            .progress_with(scan_progress.clone())
             .map(|path| {
                 let outcome = match std::fs::metadata(&path) {
                     Err(_) => FileOutcome::Failed,
@@ -157,6 +179,7 @@ impl Indexer {
                 (path, outcome)
             })
             .collect();
+        scan_progress.finish_and_clear();
 
         let mut changed: Vec<(PathBuf, Vec<String>)> = Vec::new();
         let mut emptied: Vec<PathBuf> = Vec::new();
@@ -198,6 +221,7 @@ impl Indexer {
             .collect();
         let mut texts: Vec<&str> = Vec::with_capacity(EMBED_BATCH);
         let mut refs: Vec<(&Path, u64)> = Vec::with_capacity(EMBED_BATCH);
+        let embed_progress = progress_bar(total_chunks as u64, "embedding");
         for (path, chunks) in &changed {
             for (i, chunk) in chunks.iter().enumerate() {
                 texts.push(chunk.as_str());
@@ -209,6 +233,7 @@ impl Indexer {
                         .collect();
                     let batch_refs: Vec<(&Path, u64)> = std::mem::take(&mut refs);
                     self.embed_and_stage(&batch_refs, &batch_texts, &file_fps)?;
+                    embed_progress.inc(batch_texts.len() as u64);
                 }
             }
         }
@@ -219,7 +244,9 @@ impl Indexer {
                 .collect();
             let batch_refs: Vec<(&Path, u64)> = std::mem::take(&mut refs);
             self.embed_and_stage(&batch_refs, &batch_texts, &file_fps)?;
+            embed_progress.inc(batch_texts.len() as u64);
         }
+        embed_progress.finish_and_clear();
 
         self.store.commit()?;
 

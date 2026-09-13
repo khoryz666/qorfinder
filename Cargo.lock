@@ -1758,6 +1758,7 @@ dependencies = [
  "console",
  "number_prefix",
  "portable-atomic",
+ "rayon",
  "unicode-width",
  "web-time",
 ]
@@ -2790,6 +2791,7 @@ dependencies = [
  "dirs",
  "docx-rs",
  "fastembed",
+ "indicatif",
  "lopdf",
  "md-5",
  "notify",
