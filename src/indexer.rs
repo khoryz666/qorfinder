@@ -304,14 +304,13 @@ impl Indexer {
 
 /// Resolve `path` to an absolute, canonical path used as the identity for
 /// store lookups. Falls back to canonicalizing the parent directory so
-/// deleted files can still be matched against their indexed identity. Uses
-/// `dunce` so Windows paths don't carry the `\\?\` verbatim prefix.
+/// deleted files can still be matched against their indexed identity.
 pub fn canonical_identity(path: &Path) -> Option<PathBuf> {
-    if let Ok(canonical) = dunce::canonicalize(path) {
+    if let Ok(canonical) = std::fs::canonicalize(path) {
         return Some(canonical);
     }
     let parent = path.parent()?;
     let name = path.file_name()?;
-    let canonical_parent = dunce::canonicalize(parent).ok()?;
+    let canonical_parent = std::fs::canonicalize(parent).ok()?;
     Some(canonical_parent.join(name))
 }

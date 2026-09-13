@@ -169,7 +169,7 @@ pub fn build_doc_map(corpus: &Path) -> HashMap<String, String> {
             .and_then(|s| s.to_str())
             .unwrap_or_default()
             .to_string();
-        if let Ok(canonical) = dunce::canonicalize(path) {
+        if let Ok(canonical) = std::fs::canonicalize(path) {
             map.insert(canonical.display().to_string(), stem);
         }
     }

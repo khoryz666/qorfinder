@@ -185,7 +185,7 @@ async fn execute(cli: Cli) -> Result<()> {
             if chunk_overlap >= chunk_size {
                 bail!("--chunk-overlap must be smaller than --chunk-size");
             }
-            let dir = dunce::canonicalize(&dir)
+            let dir = std::fs::canonicalize(&dir)
                 .with_context(|| format!("target directory not found: {}", dir.display()))?;
             let indexer = Arc::new(Indexer::new(store, embedder, chunk_size, chunk_overlap));
             let stats = indexer.index_dir(&dir, force).await?;
@@ -247,7 +247,7 @@ async fn execute(cli: Cli) -> Result<()> {
             );
         }
         Command::Forget { dir } => {
-            let dir = dunce::canonicalize(&dir)
+            let dir = std::fs::canonicalize(&dir)
                 .with_context(|| format!("target directory not found: {}", dir.display()))?;
             let removed = store.forget_dir(&dir)?;
             println!(

@@ -2,6 +2,8 @@
 
 An efficient semantic search desktop app for local files, using natural language processing. QorFinder indexes a directory on your machine and answers natural-language queries with the most relevant chunks, entirely offline after the first run — no server, no Docker, no cloud API.
 
+Targets Linux and WSL; there is no Windows-native build or CI coverage.
+
 ## Objectives
 
 1. **Fast, accurate hybrid search.** Dense (sentence-embedding) and lexical (BM25 keyword) retrieval are run in parallel and fused with Reciprocal Rank Fusion, so exact terms/names that embeddings blur and paraphrases that keywords miss are both covered. Index size is a secondary concern versus speed and accuracy.
