@@ -48,4 +48,10 @@ jobs:
         run: nix develop --command cargo run --release -- index tests/fixtures/small_corpus --once --index-dir /tmp/e2e-index
 
       - name: Search smoke test (e2e)
-        run: nix develop --command cargo run --release -- query "database for vectors" --index-dir /tmp/e2e-index | grep -i "qdrant"
+        run: nix develop --command cargo run --release -- query "database for vectors" --index-dir /tmp/e2e-index | grep -i "doc2.md"
+
+      # Same pipeline as the two steps above, but exercised as a real
+      # `cargo test` against the library (not just the CLI binary), so a
+      # regression fails a normal test run instead of only a shell script.
+      - name: Integration test (e2e)
+        run: nix develop --command cargo test --release --test integration -- --ignored
