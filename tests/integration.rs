@@ -12,6 +12,7 @@
 //! ```
 
 use std::path::Path;
+use std::sync::Arc;
 
 use qorfinder::embedder::Embedder;
 use qorfinder::indexer::Indexer;
@@ -24,7 +25,7 @@ async fn indexes_and_queries_the_fixture_corpus() {
     let corpus = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/small_corpus");
     let index_dir = tempfile::tempdir().unwrap();
 
-    let embedder = Embedder::try_new(None).expect("failed to load embedding model");
+    let embedder = Arc::new(Embedder::try_new(None).expect("failed to load embedding model"));
     let store = Store::open(index_dir.path(), embedder.dims()).unwrap();
     let indexer = Indexer::new(store, embedder, 512, 64);
 

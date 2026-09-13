@@ -161,8 +161,9 @@ async fn execute(cli: Cli) -> Result<()> {
         _ => {}
     }
 
-    let embedder =
-        Embedder::try_new(cli.model_cache.clone()).context("failed to load embedding model")?;
+    let embedder = Arc::new(
+        Embedder::try_new(cli.model_cache.clone()).context("failed to load embedding model")?,
+    );
     let index_dir = cli.index_dir.clone().unwrap_or_else(default_index_dir);
     let store = Store::open(&index_dir, embedder.dims()).with_context(|| {
         format!(
@@ -187,7 +188,7 @@ async fn execute(cli: Cli) -> Result<()> {
             }
             let dir = std::fs::canonicalize(&dir)
                 .with_context(|| format!("target directory not found: {}", dir.display()))?;
-            let indexer = Arc::new(Indexer::new(store, embedder, chunk_size, chunk_overlap));
+            let indexer = Indexer::new(store, embedder.clone(), chunk_size, chunk_overlap);
             let stats = indexer.index_dir(&dir, force).await?;
             tracing::info!(
                 "indexing done: {} indexed, {} unchanged, {} removed, {} skipped, {} failed",
@@ -197,8 +198,21 @@ async fn execute(cli: Cli) -> Result<()> {
                 stats.skipped,
                 stats.failed
             );
+            // Release the index lock before watching: the watcher reopens
+            // the store only for the brief window it takes to apply a batch
+            // of changes, so `query`/`stats`/etc. from another process can
+            // run the rest of the time (see watcher::watch's doc comment).
+            drop(indexer);
             if !once {
-                crate::watcher::watch(dir, indexer, Duration::from_secs(2)).await?;
+                crate::watcher::watch(
+                    dir,
+                    index_dir,
+                    embedder,
+                    chunk_size,
+                    chunk_overlap,
+                    Duration::from_secs(2),
+                )
+                .await?;
             }
         }
         Command::Query { query, top_k } => {
@@ -268,4 +282,22 @@ fn warm_model(model_cache: Option<PathBuf>) -> Result<()> {
     );
     println!("cache: {}", embedder.cache_dir().display());
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reopening_after_the_lock_holder_drops_succeeds() {
+        let dir = tempfile::tempdir().unwrap();
+        {
+            let _held = Store::open(dir.path(), 3).unwrap();
+            assert!(Store::open(dir.path(), 3).is_err());
+        }
+        // `_held` (and its tantivy IndexWriter) is dropped now, so the lock
+        // it held is released — this is the mechanism the watcher relies on
+        // to only hold the lock for the duration of one incremental update.
+        assert!(Store::open(dir.path(), 3).is_ok());
+    }
 }

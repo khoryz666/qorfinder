@@ -1,6 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::Instant;
 
 use anyhow::{Context, Result};
@@ -36,7 +37,7 @@ pub struct DirStats {
 
 pub struct Indexer {
     store: Store,
-    embedder: Embedder,
+    embedder: Arc<Embedder>,
     chunk_size: usize,
     overlap: usize,
 }
@@ -67,7 +68,7 @@ fn progress_bar(len: u64, label: &str) -> ProgressBar {
 }
 
 impl Indexer {
-    pub fn new(store: Store, embedder: Embedder, chunk_size: usize, overlap: usize) -> Self {
+    pub fn new(store: Store, embedder: Arc<Embedder>, chunk_size: usize, overlap: usize) -> Self {
         Self {
             store,
             embedder,
