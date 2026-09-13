@@ -21,12 +21,15 @@
             gcc
             cmake
             pkg-config
-            libstdc++
             openssl
           ];
 
           shellHook = ''
             export PATH="$HOME/.cargo/bin:$PATH"
+            # Rust binaries linking against the usearch C++ crate dynamically
+            # load libstdc++.so.6 at runtime; nix shells don't put it on the
+            # loader path by default, so add it explicitly.
+            export LD_LIBRARY_PATH="${pkgs.stdenv.cc.cc.lib}/lib:$LD_LIBRARY_PATH"
           '';
         };
       });
