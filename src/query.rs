@@ -77,24 +77,10 @@ pub fn run_query(
     Ok(ranked)
 }
 
-fn rrf_score(rank: usize) -> f64 {
+/// `pub` (rather than a private helper) so `tests/query.rs` can exercise the
+/// fusion math directly — `run_query` itself needs a real `Embedder`, which
+/// downloads a model on first use, so it's covered by the ignored
+/// integration tests instead (see `tests/integration.rs`), not here.
+pub fn rrf_score(rank: usize) -> f64 {
     1.0 / (RRF_K + rank as f64 + 1.0)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn rrf_score_decreases_with_rank() {
-        assert!(rrf_score(0) > rrf_score(1));
-        assert!(rrf_score(1) > rrf_score(10));
-    }
-
-    // `run_query` itself needs a real Embedder, which downloads a model on
-    // first use, so it isn't unit-tested here (see design/EVALUATION.md-style
-    // integration coverage in eval.rs instead). What's exercised in this
-    // module is the fusion math (above) and, via store's own tests, that
-    // search_vector/search_lexical/resolve_vector_key behave as run_query
-    // assumes.
 }
