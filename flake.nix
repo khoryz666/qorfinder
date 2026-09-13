@@ -28,9 +28,11 @@
             export PATH="$HOME/.cargo/bin:$PATH"
             # Rust binaries dynamically load libstdc++.so.6 (usearch C++ crate)
             # and libssl.so.3/libcrypto.so.3 (native-tls, via ureq/fastembed) at
-            # runtime; nix shells don't put these on the loader path by
-            # default, so add them explicitly.
-            export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [ pkgs.stdenv.cc.cc pkgs.openssl ]}:$LD_LIBRARY_PATH"
+            # runtime. Bake those paths into built binaries via rpath (RUSTFLAGS)
+            # instead of exporting LD_LIBRARY_PATH: the latter leaks into every
+            # process started from this shell (git/ssh included), and nix's
+            # glibc there is newer than the host's, which breaks them.
+            export RUSTFLAGS="-C link-args=-Wl,-rpath,${pkgs.lib.makeLibraryPath [ pkgs.stdenv.cc.cc pkgs.openssl ]} $RUSTFLAGS"
           '';
         };
       });
