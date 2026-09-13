@@ -1,5 +1,5 @@
 //! End-to-end coverage of the real pipeline: parse -> chunk -> embed ->
-//! index -> query, against the repo's small fixture corpus.
+//! index -> query, against a small sample corpus.
 //!
 //! Unlike `cargo test --lib`, this needs a real `Embedder`, which downloads
 //! the ONNX model from HuggingFace on first use (afterwards it's cached and
@@ -11,7 +11,6 @@
 //! cargo test --test integration -- --ignored
 //! ```
 
-use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -23,20 +22,66 @@ use qorfinder::query::run_query;
 use qorfinder::store::Store;
 use qorfinder::watcher::watch;
 
+/// Fetch a plain-text summary of a Wikipedia article from its free,
+/// no-key-required REST API. Used to build a small sample corpus on the fly
+/// instead of committing fixture files — the semantic-search assertions
+/// below need real, topically distinct prose (a lorem-ipsum generator
+/// wouldn't give the dense embedding side anything meaningful to match),
+/// and this endpoint is stable, free, and needs no authentication.
+fn wikipedia_summary(title: &str) -> String {
+    let url = format!("https://en.wikipedia.org/api/rest_v1/page/summary/{title}");
+    let body: serde_json::Value = ureq::get(&url)
+        .call()
+        .unwrap_or_else(|err| panic!("failed to fetch Wikipedia summary for {title}: {err}"))
+        .into_json()
+        .unwrap_or_else(|err| panic!("failed to parse Wikipedia summary for {title}: {err}"));
+    body["extract"]
+        .as_str()
+        .unwrap_or_else(|| panic!("no 'extract' field in Wikipedia summary for {title}"))
+        .to_string()
+}
+
+/// Write a small 3-document sample corpus into a fresh temp directory:
+/// Rust, vector databases (the query target for several tests below), and
+/// machine learning — fetched fresh from Wikipedia each run (see
+/// `wikipedia_summary`).
+fn write_sample_corpus() -> tempfile::TempDir {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(
+        dir.path().join("doc1.txt"),
+        wikipedia_summary("Rust_(programming_language)"),
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("doc2.md"),
+        format!(
+            "# Vector Databases\n\n{}",
+            wikipedia_summary("Vector_database")
+        ),
+    )
+    .unwrap();
+    std::fs::write(
+        dir.path().join("doc3.txt"),
+        wikipedia_summary("Machine_learning"),
+    )
+    .unwrap();
+    dir
+}
+
 #[tokio::test]
 #[ignore = "downloads/loads the real embedding model on first run"]
-async fn indexes_and_queries_the_fixture_corpus() {
-    let corpus = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/small_corpus");
+async fn indexes_and_queries_a_small_corpus() {
+    let corpus = write_sample_corpus();
     let index_dir = tempfile::tempdir().unwrap();
 
     let embedder = Arc::new(Embedder::try_new(None).expect("failed to load embedding model"));
     let store = Store::open(index_dir.path(), embedder.dims()).unwrap();
     let indexer = Indexer::new(store, embedder, 512, 64);
 
-    let stats = indexer.index_dir(&corpus, false).await.unwrap();
+    let stats = indexer.index_dir(corpus.path(), false).await.unwrap();
     assert_eq!(
         stats.indexed, 3,
-        "expected all 3 fixture files to be indexed"
+        "expected all 3 sample files to be indexed"
     );
     assert_eq!(stats.failed, 0);
 
@@ -54,7 +99,7 @@ async fn indexes_and_queries_the_fixture_corpus() {
     );
 
     // Re-running unchanged should be a pure no-op on the fingerprint side.
-    let rescan = indexer.index_dir(&corpus, false).await.unwrap();
+    let rescan = indexer.index_dir(corpus.path(), false).await.unwrap();
     assert_eq!(rescan.indexed, 0);
     assert_eq!(rescan.unchanged, 3);
 }
@@ -62,20 +107,18 @@ async fn indexes_and_queries_the_fixture_corpus() {
 #[tokio::test]
 #[ignore = "downloads/loads the real embedding model; runs the file watcher for several seconds"]
 async fn watcher_reindexes_and_unindexes_files_while_releasing_the_lock() {
-    let source = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/small_corpus");
-    let watch_dir = tempfile::tempdir().unwrap();
-    for name in ["doc1.txt", "doc2.md", "doc3.txt"] {
-        std::fs::copy(source.join(name), watch_dir.path().join(name)).unwrap();
-    }
-
+    let watch_dir = write_sample_corpus();
     let index_dir = tempfile::tempdir().unwrap();
     let embedder = Arc::new(Embedder::try_new(None).expect("failed to load embedding model"));
     let dims = embedder.dims();
 
     // Initial scan, then release the lock exactly like the CLI does before
     // handing off to the watcher (see cli.rs's Index command).
+    // A generous chunk size keeps each Wikipedia summary in a single chunk
+    // regardless of its length, so `store.count()` below stays a simple
+    // "one vector per file" check.
     let store = Store::open(index_dir.path(), dims).unwrap();
-    let indexer = Indexer::new(store, embedder.clone(), 512, 64);
+    let indexer = Indexer::new(store, embedder.clone(), 4096, 64);
     let stats = indexer.index_dir(watch_dir.path(), false).await.unwrap();
     assert_eq!(stats.indexed, 3);
     drop(indexer);
@@ -132,10 +175,10 @@ async fn watcher_reindexes_and_unindexes_files_while_releasing_the_lock() {
 #[tokio::test]
 #[ignore = "downloads/loads the real embedding model on first run"]
 async fn forget_command_removes_a_directory_from_the_index() {
-    let corpus = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/small_corpus");
+    let corpus = write_sample_corpus();
     let index_dir = tempfile::tempdir().unwrap();
     let index_dir_str = index_dir.path().to_str().unwrap();
-    let corpus_str = corpus.to_str().unwrap();
+    let corpus_str = corpus.path().to_str().unwrap();
 
     let index_cli = Cli::try_parse_from([
         "qorfinder",
@@ -144,6 +187,11 @@ async fn forget_command_removes_a_directory_from_the_index() {
         "index",
         corpus_str,
         "--once",
+        // A generous chunk size keeps each Wikipedia summary in a single
+        // chunk regardless of its length, so `store.count()` below stays a
+        // simple "one vector per file" check.
+        "--chunk-size",
+        "4096",
     ])
     .unwrap();
     execute(index_cli).await.unwrap();

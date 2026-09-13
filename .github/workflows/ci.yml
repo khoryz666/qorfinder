@@ -35,17 +35,28 @@ jobs:
       - name: Lint
         run: nix develop --command cargo clippy --all-targets -- -D warnings
 
+      # Runs both the few remaining in-crate unit tests (store engine
+      # internals, CLI plumbing — kept private, see tests/ for everything
+      # that only touches public API) and every file under tests/.
       - name: Unit tests
-        run: nix develop --command cargo test --lib
+        run: nix develop --command cargo test --tests
 
       - name: Build (release)
         run: nix develop --command cargo build --release
 
       # No service to start: the store is embedded (tantivy + usearch +
       # redb), so end-to-end coverage is just indexing and querying a fixed
-      # index dir.
-      - name: Index small fixture (e2e)
-        run: nix develop --command cargo run --release -- index tests/fixtures/small_corpus --once --index-dir /tmp/e2e-index
+      # index dir. The corpus is generated inline rather than committed as a
+      # fixture file; it just needs each doc to be lexically distinct.
+      - name: Prepare a small e2e corpus
+        run: |
+          mkdir -p /tmp/e2e-corpus
+          printf 'Rust is a systems programming language focused on safety, speed, and concurrency.\n' > /tmp/e2e-corpus/doc1.txt
+          printf '# Vector Databases\n\nA vector database stores and searches embedding vectors for semantic search over documents.\n' > /tmp/e2e-corpus/doc2.md
+          printf 'Machine learning studies algorithms that learn patterns from data to make predictions.\n' > /tmp/e2e-corpus/doc3.txt
+
+      - name: Index small e2e corpus
+        run: nix develop --command cargo run --release -- index /tmp/e2e-corpus --once --index-dir /tmp/e2e-index
 
       - name: Search smoke test (e2e)
         run: nix develop --command cargo run --release -- query "database for vectors" --index-dir /tmp/e2e-index | grep -i "doc2.md"
