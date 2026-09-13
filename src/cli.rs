@@ -178,12 +178,7 @@ async fn execute(cli: Cli) -> Result<()> {
             once,
             force,
         } => {
-            if chunk_size == 0 {
-                bail!("--chunk-size must be positive");
-            }
-            if chunk_overlap >= chunk_size {
-                bail!("--chunk-overlap must be smaller than --chunk-size");
-            }
+            validate_chunk_params(chunk_size, chunk_overlap)?;
             let dir = std::fs::canonicalize(&dir)
                 .with_context(|| format!("target directory not found: {}", dir.display()))?;
             let indexer = Indexer::new(store, embedder.clone(), chunk_size, chunk_overlap);
@@ -311,6 +306,19 @@ fn is_lock_busy(err: &anyhow::Error) -> bool {
     })
 }
 
+/// Chunk parameters that don't make sense: a zero-size chunk has nothing in
+/// it, and an overlap at or beyond the chunk size would repeat the whole
+/// chunk (or more) on every step instead of advancing.
+fn validate_chunk_params(chunk_size: usize, chunk_overlap: usize) -> Result<()> {
+    if chunk_size == 0 {
+        bail!("--chunk-size must be positive");
+    }
+    if chunk_overlap >= chunk_size {
+        bail!("--chunk-overlap must be smaller than --chunk-size");
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -359,5 +367,99 @@ mod tests {
         // it held is released — this is the mechanism the watcher relies on
         // to only hold the lock for the duration of one incremental update.
         assert!(Store::open(dir.path(), 3).is_ok());
+    }
+
+    #[test]
+    fn rejects_zero_chunk_size() {
+        assert!(validate_chunk_params(0, 0).is_err());
+    }
+
+    #[test]
+    fn rejects_overlap_not_smaller_than_chunk_size() {
+        assert!(validate_chunk_params(512, 512).is_err());
+        assert!(validate_chunk_params(512, 600).is_err());
+    }
+
+    #[test]
+    fn accepts_valid_chunk_params() {
+        assert!(validate_chunk_params(512, 64).is_ok());
+    }
+
+    #[test]
+    fn cli_parses_index_command_defaults() {
+        let cli = Cli::try_parse_from(["qorfinder", "index", "some/dir"]).unwrap();
+        match cli.command {
+            Command::Index {
+                dir,
+                chunk_size,
+                chunk_overlap,
+                once,
+                force,
+            } => {
+                assert_eq!(dir, PathBuf::from("some/dir"));
+                assert_eq!(chunk_size, 512);
+                assert_eq!(chunk_overlap, 64);
+                assert!(!once);
+                assert!(!force);
+            }
+            _ => panic!("expected an Index command"),
+        }
+    }
+
+    #[test]
+    fn cli_parses_index_command_flags() {
+        let cli = Cli::try_parse_from([
+            "qorfinder",
+            "index",
+            "some/dir",
+            "--once",
+            "--force",
+            "--chunk-size",
+            "256",
+            "--chunk-overlap",
+            "32",
+        ])
+        .unwrap();
+        match cli.command {
+            Command::Index {
+                chunk_size,
+                chunk_overlap,
+                once,
+                force,
+                ..
+            } => {
+                assert_eq!(chunk_size, 256);
+                assert_eq!(chunk_overlap, 32);
+                assert!(once);
+                assert!(force);
+            }
+            _ => panic!("expected an Index command"),
+        }
+    }
+
+    #[test]
+    fn cli_parses_query_command_default_top_k() {
+        let cli = Cli::try_parse_from(["qorfinder", "query", "hello world"]).unwrap();
+        match cli.command {
+            Command::Query { query, top_k } => {
+                assert_eq!(query, "hello world");
+                assert_eq!(top_k, 5);
+            }
+            _ => panic!("expected a Query command"),
+        }
+    }
+
+    #[test]
+    fn cli_parses_forget_command() {
+        let cli = Cli::try_parse_from(["qorfinder", "forget", "some/dir"]).unwrap();
+        match cli.command {
+            Command::Forget { dir } => assert_eq!(dir, PathBuf::from("some/dir")),
+            _ => panic!("expected a Forget command"),
+        }
+    }
+
+    #[test]
+    fn cli_rejects_unknown_command() {
+        assert!(Cli::try_parse_from(["qorfinder", "not-a-real-command"]).is_err());
     }
 }
