@@ -21,6 +21,7 @@
             gcc
             cmake
             pkg-config
+            libstdc++
             openssl
           ];
 
