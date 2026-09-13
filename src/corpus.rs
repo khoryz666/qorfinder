@@ -62,14 +62,17 @@ pub fn sanitize_doc_id(id: &str) -> String {
         .collect()
 }
 
-fn beir_body(title: Option<&str>, text: &str) -> String {
+/// Body text written to a BEIR corpus file: the title (when present) on its
+/// own line above the text.
+pub fn beir_body(title: Option<&str>, text: &str) -> String {
     match title {
         Some(title) if !title.is_empty() => format!("{title}\n{text}"),
         _ => text.to_string(),
     }
 }
 
-fn quran_file_name(surah: u64, ayah: u64) -> String {
+/// File name for one ayah's corpus file.
+pub fn quran_file_name(surah: u64, ayah: u64) -> String {
     format!("surah-{surah}-ayah-{ayah}.txt")
 }
 
@@ -190,7 +193,9 @@ pub fn prepare_quran(out_dir: &Path) -> Result<PathBuf> {
     Ok(corpus_dir)
 }
 
-fn count_txt_files(dir: &Path) -> usize {
+/// Number of `.txt` files under `dir`, recursively; `0` if `dir` doesn't
+/// exist. Used to detect whether a corpus is already prepared.
+pub fn count_txt_files(dir: &Path) -> usize {
     if !dir.is_dir() {
         return 0;
     }
@@ -247,41 +252,5 @@ fn find_beir_files(dir: &Path) -> Result<(PathBuf, PathBuf, PathBuf)> {
     match (corpus_json, queries_json, test_tsv) {
         (Some(c), Some(q), Some(t)) => Ok((c, q, t)),
         _ => bail!("expected corpus.jsonl, queries.jsonl and test.tsv inside the archive"),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn sanitizes_forbidden_filename_chars() {
-        assert_eq!(sanitize_doc_id("PLAIN-2"), "PLAIN-2");
-        assert_eq!(
-            sanitize_doc_id("a/b\\c:d*e?f\"g<h>i|j"),
-            "a_b_c_d_e_f_g_h_i_j"
-        );
-    }
-
-    #[test]
-    fn beir_body_prefers_title() {
-        assert_eq!(beir_body(Some("Title"), "text"), "Title\ntext");
-        assert_eq!(beir_body(None, "text"), "text");
-        assert_eq!(beir_body(Some(""), "text"), "text");
-    }
-
-    #[test]
-    fn quran_file_names_are_stable() {
-        assert_eq!(quran_file_name(2, 255), "surah-2-ayah-255.txt");
-    }
-
-    #[test]
-    fn counts_txt_files() {
-        let dir = tempfile::tempdir().unwrap();
-        fs::write(dir.path().join("a.txt"), "x").unwrap();
-        fs::write(dir.path().join("b.md"), "y").unwrap();
-        fs::create_dir(dir.path().join("sub")).unwrap();
-        fs::write(dir.path().join("sub").join("c.txt"), "z").unwrap();
-        assert_eq!(count_txt_files(dir.path()), 2);
     }
 }
