@@ -159,13 +159,22 @@ impl LexicalStore {
         Ok(())
     }
 
-    /// BM25 search over `text`, ranked highest score first.
+    /// BM25 search over `text`, ranked highest score first. Queries are
+    /// natural-language text the user typed, not deliberate query syntax, so
+    /// parsing is lenient: punctuation tantivy would otherwise treat as
+    /// query-language syntax (`:`, unbalanced `"`, `-`, ...) is downgraded to
+    /// a best-effort query instead of failing the whole search.
     pub fn search(&self, query_text: &str, k: usize) -> Result<Vec<LexicalHit>> {
         let searcher = self.reader.searcher();
         let query_parser = QueryParser::for_index(&self.index, vec![self.fields.text]);
-        let query = query_parser
-            .parse_query(query_text)
-            .context("failed to parse lexical query")?;
+        let (query, errors) = query_parser.parse_query_lenient(query_text);
+        if !errors.is_empty() {
+            tracing::debug!(
+                ?errors,
+                query_text,
+                "lenient-parsed lexical query with issues"
+            );
+        }
         let top_docs: Vec<(f32, tantivy::DocAddress)> = searcher
             .search(&query, &TopDocs::with_limit(k).order_by_score())
             .context("tantivy search failed")?;
@@ -283,6 +292,21 @@ mod tests {
         let resolved = s.resolve_vector_key(42).unwrap().unwrap();
         assert_eq!(resolved.file_path, "a.txt");
         assert_eq!(resolved.text, "hello world");
+    }
+
+    #[test]
+    fn search_tolerates_query_syntax_characters() {
+        // Real user queries are natural language, not deliberate tantivy
+        // query syntax; ':' , unbalanced '"', etc. must not make the whole
+        // search fail (see query.rs / cli.rs callers, which have no
+        // fallback if this errors).
+        let dir = tempfile::tempdir().unwrap();
+        let s = store(dir.path());
+        s.upsert_chunk("a.txt:0", "a.txt", 0, "ratio 3 to 4 explained", (1, 2), 10)
+            .unwrap();
+        s.commit().unwrap();
+        assert!(s.search("ratio 3:4 explained", 5).is_ok());
+        assert!(s.search("a \"quoted phrase", 5).is_ok());
     }
 
     #[test]
