@@ -1,9 +1,11 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result, bail};
 use clap::{Parser, Subcommand};
+use tantivy::TantivyError;
+use tantivy::directory::error::LockError;
 
 use crate::embedder::Embedder;
 use crate::indexer::Indexer;
@@ -165,12 +167,8 @@ async fn execute(cli: Cli) -> Result<()> {
         Embedder::try_new(cli.model_cache.clone()).context("failed to load embedding model")?,
     );
     let index_dir = cli.index_dir.clone().unwrap_or_else(default_index_dir);
-    let store = Store::open(&index_dir, embedder.dims()).with_context(|| {
-        format!(
-            "failed to open index at {} (delete it to rebuild from scratch)",
-            index_dir.display()
-        )
-    })?;
+    let store = Store::open(&index_dir, embedder.dims())
+        .map_err(|err| describe_open_error(err, &index_dir))?;
 
     match cli.command {
         Command::Index {
@@ -284,9 +282,71 @@ fn warm_model(model_cache: Option<PathBuf>) -> Result<()> {
     Ok(())
 }
 
+/// Turn a `Store::open` failure into an accurate, non-destructive message.
+/// A lock-busy failure means another `qorfinder` process (typically `index`
+/// running in watch mode) is briefly using this index — the fix is to wait
+/// or use a different `--index-dir`, never to delete anything. Any other
+/// failure (corruption, a dims mismatch) is the case where "delete it and
+/// rebuild" actually is the right advice.
+fn describe_open_error(err: anyhow::Error, index_dir: &Path) -> anyhow::Error {
+    if is_lock_busy(&err) {
+        return anyhow::anyhow!(
+            "index at {} is currently in use by another qorfinder process (e.g. `index` \
+             running in watch mode) — wait for it to finish, or use a different --index-dir",
+            index_dir.display()
+        );
+    }
+    err.context(format!(
+        "failed to open index at {} (delete it to rebuild from scratch)",
+        index_dir.display()
+    ))
+}
+
+fn is_lock_busy(err: &anyhow::Error) -> bool {
+    err.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<TantivyError>(),
+            Some(TantivyError::LockFailure(LockError::LockBusy, _))
+        )
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn detects_lock_busy_and_gives_actionable_message() {
+        let dir = tempfile::tempdir().unwrap();
+        let _held = Store::open(dir.path(), 3).unwrap(); // holds the write lock
+        let err = match Store::open(dir.path(), 3) {
+            Err(err) => err,
+            Ok(_) => panic!("expected opening a locked index to fail"),
+        };
+        assert!(
+            is_lock_busy(&err),
+            "expected a lock-busy error, got: {err:#}"
+        );
+
+        let described = describe_open_error(err, dir.path());
+        let message = described.to_string();
+        assert!(message.contains("in use by another qorfinder process"));
+        assert!(!message.contains("delete it"));
+    }
+
+    #[test]
+    fn non_lock_errors_keep_the_rebuild_advice() {
+        let dir = tempfile::tempdir().unwrap();
+        Store::open(dir.path(), 3).unwrap(); // writes version.json with dims=3, then drops
+
+        let err = match Store::open(dir.path(), 4) {
+            Err(err) => err, // dims mismatch, no lock involved
+            Ok(_) => panic!("expected opening with a mismatched dims to fail"),
+        };
+        assert!(!is_lock_busy(&err));
+        let described = describe_open_error(err, dir.path());
+        assert!(described.to_string().contains("delete it to rebuild"));
+    }
 
     #[test]
     fn reopening_after_the_lock_holder_drops_succeeds() {
