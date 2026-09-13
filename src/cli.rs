@@ -143,7 +143,12 @@ pub fn run() -> Result<()> {
     rt.block_on(async move { execute(cli).await })
 }
 
-async fn execute(cli: Cli) -> Result<()> {
+/// `pub` so integration tests can drive the CLI's dispatch logic directly
+/// (via `Cli::try_parse_from` + `execute`) without going through `run()`,
+/// which calls `tracing_subscriber::fmt().init()` — a process-global setup
+/// call that panics if invoked more than once, making `run()` itself unsafe
+/// to call from more than one test in the same test binary.
+pub async fn execute(cli: Cli) -> Result<()> {
     match &cli.command {
         Command::Warm => return warm_model(cli.model_cache.clone()),
         Command::Corpus { corpus } => {

@@ -15,7 +15,9 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 
-use qorfinder::embedder::Embedder;
+use clap::Parser;
+use qorfinder::cli::{Cli, execute};
+use qorfinder::embedder::{Embedder, MODEL_DIMS};
 use qorfinder::indexer::Indexer;
 use qorfinder::query::run_query;
 use qorfinder::store::Store;
@@ -125,4 +127,45 @@ async fn watcher_reindexes_and_unindexes_files_while_releasing_the_lock() {
     );
 
     handle.abort();
+}
+
+#[tokio::test]
+#[ignore = "downloads/loads the real embedding model on first run"]
+async fn forget_command_removes_a_directory_from_the_index() {
+    let corpus = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/small_corpus");
+    let index_dir = tempfile::tempdir().unwrap();
+    let index_dir_str = index_dir.path().to_str().unwrap();
+    let corpus_str = corpus.to_str().unwrap();
+
+    let index_cli = Cli::try_parse_from([
+        "qorfinder",
+        "--index-dir",
+        index_dir_str,
+        "index",
+        corpus_str,
+        "--once",
+    ])
+    .unwrap();
+    execute(index_cli).await.unwrap();
+
+    let store = Store::open(index_dir.path(), MODEL_DIMS).unwrap();
+    assert_eq!(store.count().unwrap(), 3);
+    drop(store);
+
+    let forget_cli = Cli::try_parse_from([
+        "qorfinder",
+        "--index-dir",
+        index_dir_str,
+        "forget",
+        corpus_str,
+    ])
+    .unwrap();
+    execute(forget_cli).await.unwrap();
+
+    let store = Store::open(index_dir.path(), MODEL_DIMS).unwrap();
+    assert_eq!(
+        store.count().unwrap(),
+        0,
+        "expected `forget` to remove every chunk under the given directory"
+    );
 }
