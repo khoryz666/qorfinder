@@ -1,7 +1,6 @@
 /target
 /data
 /tools
-qdrant_storage/
 .cache/
 .fastembed_cache/
 .env
