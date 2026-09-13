@@ -45,6 +45,12 @@ cargo test --lib
 
 Unit tests are fast and fully offline — they never touch the embedding model or build a real index.
 
+For an end-to-end check of the real pipeline (parse -> chunk -> embed -> index -> query) against the fixture corpus in `tests/fixtures/small_corpus`, run the ignored integration test — it needs the real embedding model, so it's excluded from the default `cargo test --lib` run:
+
+```bash
+cargo test --test integration -- --ignored
+```
+
 For retrieval-quality benchmarks (nDCG/Recall/MRR against BEIR-style corpora), see [BENCHMARK.md](BENCHMARK.md).
 
 ## Deploy

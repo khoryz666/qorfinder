@@ -50,6 +50,17 @@ impl Indexer {
         }
     }
 
+    /// The store this indexer writes to — exposed so a caller (tests,
+    /// mainly) can query the same store right after indexing into it.
+    pub fn store(&self) -> &Store {
+        &self.store
+    }
+
+    /// The embedder this indexer embeds chunks with — see [`Self::store`].
+    pub fn embedder(&self) -> &Embedder {
+        &self.embedder
+    }
+
     /// Walk `root` and index every supported file. Files whose (mtime, size)
     /// match the fingerprint already stored are skipped, so re-running the
     /// command only re-embeds what actually changed. Fingerprints of files
