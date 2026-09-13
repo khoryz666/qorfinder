@@ -96,6 +96,13 @@ enum Command {
         #[arg(long, value_enum, default_value = "hybrid")]
         mode: crate::eval::EvalMode,
     },
+    /// Remove all indexed files under a directory from the index, without
+    /// touching anything on disk (use this to stop tracking a directory you
+    /// no longer want searched)
+    Forget {
+        /// Directory whose indexed files should be removed from the index
+        dir: PathBuf,
+    },
     /// Download and prepare a benchmark corpus (no server needed)
     Corpus {
         #[command(subcommand)]
@@ -237,6 +244,15 @@ async fn execute(cli: Cli) -> Result<()> {
                 "time: {:.2} s ({:.1} ms/query)",
                 report.total_seconds,
                 report.total_seconds * 1000.0 / report.evaluated.max(1) as f64
+            );
+        }
+        Command::Forget { dir } => {
+            let dir = dunce::canonicalize(&dir)
+                .with_context(|| format!("target directory not found: {}", dir.display()))?;
+            let removed = store.forget_dir(&dir)?;
+            println!(
+                "removed {removed} file(s) under {} from the index",
+                dir.display()
             );
         }
         Command::Corpus { .. } | Command::Warm => unreachable!("handled above"),

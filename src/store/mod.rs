@@ -197,6 +197,27 @@ impl Store {
         self.fingerprint.get(&path.display().to_string())
     }
 
+    /// Remove every currently-indexed file under `root` from the store,
+    /// without touching anything on disk. Returns how many files were
+    /// removed. Lets a user stop tracking a directory that still exists,
+    /// short of deleting the whole index. `root` should already be
+    /// canonicalized the same way indexed paths are (see
+    /// `indexer::canonical_identity`).
+    pub fn forget_dir(&self, root: &Path) -> Result<usize> {
+        let fingerprints = self.file_fingerprints()?;
+        let mut removed = 0usize;
+        for path_str in fingerprints.keys() {
+            if Path::new(path_str).starts_with(root) {
+                self.delete_file(Path::new(path_str))?;
+                removed += 1;
+            }
+        }
+        if removed > 0 {
+            self.commit()?;
+        }
+        Ok(removed)
+    }
+
     /// Dense-only nearest neighbors, as (usearch key, cosine distance).
     pub fn search_vector(&self, vector: &[f32], k: usize) -> Result<Vec<(u64, f32)>> {
         self.vector.search(vector, k)
@@ -313,6 +334,55 @@ mod tests {
         assert_eq!(hits.len(), 1);
         assert_eq!(hits[0].text, "second version");
         assert_eq!(store.file_fingerprints().unwrap()["/a.txt"].chunk_count, 1);
+    }
+
+    #[test]
+    fn forget_dir_removes_only_files_under_root() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = open(dir.path());
+        store
+            .stage_chunk(
+                Path::new("/keep/root/a.txt"),
+                0,
+                "a",
+                &[1.0, 0.0, 0.0],
+                (1, 1),
+            )
+            .unwrap();
+        store
+            .stage_chunk(
+                Path::new("/keep/root/b.txt"),
+                0,
+                "b",
+                &[0.0, 1.0, 0.0],
+                (1, 1),
+            )
+            .unwrap();
+        store
+            .stage_chunk(
+                Path::new("/keep/elsewhere.txt"),
+                0,
+                "c",
+                &[0.0, 0.0, 1.0],
+                (1, 1),
+            )
+            .unwrap();
+        store.commit().unwrap();
+
+        let removed = store.forget_dir(Path::new("/keep/root")).unwrap();
+        assert_eq!(removed, 2);
+        let fps = store.file_fingerprints().unwrap();
+        assert!(!fps.contains_key("/keep/root/a.txt"));
+        assert!(!fps.contains_key("/keep/root/b.txt"));
+        assert!(fps.contains_key("/keep/elsewhere.txt"));
+        assert_eq!(store.count().unwrap(), 1);
+    }
+
+    #[test]
+    fn forget_dir_on_untracked_root_is_a_no_op() {
+        let dir = tempfile::tempdir().unwrap();
+        let store = open(dir.path());
+        assert_eq!(store.forget_dir(Path::new("/nothing/here")).unwrap(), 0);
     }
 
     #[test]
