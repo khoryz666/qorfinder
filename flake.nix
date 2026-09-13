@@ -26,10 +26,11 @@
 
           shellHook = ''
             export PATH="$HOME/.cargo/bin:$PATH"
-            # Rust binaries linking against the usearch C++ crate dynamically
-            # load libstdc++.so.6 at runtime; nix shells don't put it on the
-            # loader path by default, so add it explicitly.
-            export LD_LIBRARY_PATH="${pkgs.stdenv.cc.cc.lib}/lib:$LD_LIBRARY_PATH"
+            # Rust binaries dynamically load libstdc++.so.6 (usearch C++ crate)
+            # and libssl.so.3/libcrypto.so.3 (native-tls, via ureq/fastembed) at
+            # runtime; nix shells don't put these on the loader path by
+            # default, so add them explicitly.
+            export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [ pkgs.stdenv.cc.cc pkgs.openssl ]}:$LD_LIBRARY_PATH"
           '';
         };
       });
