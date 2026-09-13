@@ -13,11 +13,17 @@ use crate::embedder::Embedder;
 use crate::parser::{is_supported, parse_file};
 use crate::store::{Store, file_fingerprint};
 
-/// Chunks embedded per model call (fastembed splits each call into its own
-/// parallel sub-batches internally). Embedding batches may span multiple
-/// files; `Store::stage_chunk` accumulates a file's chunks incrementally so
-/// that's safe regardless of where a batch boundary falls.
-const EMBED_BATCH: usize = 256;
+/// Chunks embedded per model call. CPU transformer inference holds
+/// activations (self-attention is O(batch_size x sequence_length^2)) for the
+/// whole batch at once, so this trades throughput for peak memory — 256
+/// (fastembed's own default) measured at 6-7 GB resident indexing 1,000
+/// short SciFact abstracts on a 384-dim/512-token model, enough to get the
+/// process OOM-killed on an 8 GB machine. 32 is the conventional CPU
+/// sentence-embedding batch size and keeps peak memory in the hundreds of
+/// MB. Embedding batches may span multiple files; `Store::stage_chunk`
+/// accumulates a file's chunks incrementally so that's safe regardless of
+/// where a batch boundary falls.
+const EMBED_BATCH: usize = 32;
 
 #[derive(Debug, Default)]
 pub struct DirStats {
