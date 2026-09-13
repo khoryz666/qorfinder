@@ -87,9 +87,7 @@ impl FingerprintStore {
         Ok(())
     }
 
-    /// Every known file's fingerprint. Replaces the old Qdrant-backed
-    /// `Store::file_fingerprints()`'s full-collection scroll with an O(files)
-    /// table iteration.
+    /// Every known file's fingerprint, via an O(files) table iteration.
     pub fn all(&self) -> Result<HashMap<String, FingerprintRecord>> {
         let read_txn = self.db.begin_read()?;
         let table = read_txn.open_table(TABLE)?;
