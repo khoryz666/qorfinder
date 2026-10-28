@@ -80,3 +80,10 @@ pub struct IndexMeta {
     pub max_tokens: usize,
     pub overlap: usize,
 }
+
+/// One search result: a chunk and its similarity to the query.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Hit {
+    pub chunk_id: u32,
+    pub score: f32,
+}

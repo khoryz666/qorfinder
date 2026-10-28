@@ -7,7 +7,8 @@ pub mod format;
 pub mod index;
 pub mod ingest;
 pub mod prepare;
+pub mod search;
 pub mod store;
 pub mod types;
 
-pub use types::{Chunk, Document, Format, IndexMeta};
+pub use types::{Chunk, Document, Format, Hit, IndexMeta};
