@@ -57,9 +57,7 @@ pub fn extract(path: &Path, format: Format) -> Result<Extracted, ParseError> {
     match format {
         Format::Txt => extract_txt(path),
         Format::Pdf => extract_pdf(path),
-        Format::Docx => Err(ParseError::Format(
-            "docx extraction is not supported yet".into(),
-        )),
+        Format::Docx => extract_docx(path),
     }
 }
 
@@ -111,4 +109,43 @@ fn extract_pdf_bytes(bytes: &[u8]) -> Result<Extracted, ParseError> {
         return Err(ParseError::NoTextLayer);
     }
     Ok(out)
+}
+
+/// DOCX text: every non-empty paragraph, including those inside tables,
+/// separated by a paragraph break. DOCX has no fixed pages, so none are
+/// recorded.
+fn extract_docx(path: &Path) -> Result<Extracted, ParseError> {
+    let bytes = std::fs::read(path)?;
+    let docx = std::panic::catch_unwind(|| docx_rs::read_docx(&bytes))
+        .map_err(|_| ParseError::Format("docx parser panicked".into()))?
+        .map_err(|e| ParseError::Format(e.to_string()))?;
+    let mut paragraphs = Vec::new();
+    for child in &docx.document.children {
+        match child {
+            docx_rs::DocumentChild::Paragraph(p) => paragraphs.push(p.raw_text()),
+            docx_rs::DocumentChild::Table(t) => table_paragraphs(t, &mut paragraphs),
+            _ => {}
+        }
+    }
+    paragraphs.retain(|p| !p.trim().is_empty());
+    Ok(Extracted {
+        text: paragraphs.join("\n\n"),
+        pages: Vec::new(),
+    })
+}
+
+fn table_paragraphs(table: &docx_rs::Table, out: &mut Vec<String>) {
+    use docx_rs::{TableCellContent, TableChild, TableRowChild};
+
+    for TableChild::TableRow(row) in &table.rows {
+        for TableRowChild::TableCell(cell) in &row.cells {
+            for content in &cell.children {
+                match content {
+                    TableCellContent::Paragraph(p) => out.push(p.raw_text()),
+                    TableCellContent::Table(t) => table_paragraphs(t, out),
+                    _ => {}
+                }
+            }
+        }
+    }
 }

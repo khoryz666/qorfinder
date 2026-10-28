@@ -243,3 +243,41 @@ fn pdf_with_almost_no_text_is_reported_as_scanned() {
     assert!(matches!(err, ParseError::NoTextLayer), "got {err:?}");
     assert_eq!(err.to_string(), "no text layer");
 }
+
+#[test]
+fn extracts_docx_paragraphs_and_tables() {
+    use docx_rs::{Docx, Paragraph, Run, Table, TableCell, TableRow};
+
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("a.docx");
+    let para = |text: &str| Paragraph::new().add_run(Run::new().add_text(text));
+    Docx::new()
+        .add_paragraph(para("1. Definitions"))
+        .add_paragraph(Paragraph::new())
+        .add_paragraph(para("\"Agreement\" means this ").add_run(Run::new().add_text("contract.")))
+        .add_table(Table::new(vec![TableRow::new(vec![
+            TableCell::new().add_paragraph(para("Fee")),
+            TableCell::new().add_paragraph(para("USD 500")),
+        ])]))
+        .build()
+        .pack(fs::File::create(&path).unwrap())
+        .unwrap();
+
+    let out = extract(&path, Format::Docx).unwrap();
+    assert_eq!(
+        out.text,
+        "1. Definitions\n\n\"Agreement\" means this contract.\n\nFee\n\nUSD 500"
+    );
+    assert!(out.pages.is_empty());
+}
+
+#[test]
+fn corrupt_docx_is_a_parse_error() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("bad.docx");
+    fs::write(&path, b"PK not a zip").unwrap();
+    assert!(matches!(
+        extract(&path, Format::Docx),
+        Err(ParseError::Format(_))
+    ));
+}
