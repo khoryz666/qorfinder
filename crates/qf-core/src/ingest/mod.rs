@@ -1,8 +1,10 @@
 //! Ingestion: find the files to index and extract their text.
 
+mod extract;
 mod hash;
 mod walk;
 
+pub use extract::{Extracted, MAX_FILE_SIZE_BYTES, ParseError, extract};
 pub use hash::hash_file;
 pub use walk::{FoundFile, walk};
 
