@@ -2,8 +2,83 @@
 
 use std::cmp::{Ordering, Reverse};
 use std::collections::BinaryHeap;
+use std::path::Path;
+use std::time::{Duration, Instant};
 
-use crate::Hit;
+use crate::embed::{EmbedError, Embedder};
+use crate::store::{Store, StoreError, VECTORS_FILE, read_vectors};
+use crate::{Hit, IndexMeta};
+
+#[derive(Debug, thiserror::Error)]
+pub enum SearchError {
+    #[error(transparent)]
+    Store(#[from] StoreError),
+    #[error("embedding the query failed: {0}")]
+    Embed(#[from] EmbedError),
+}
+
+/// Hits for one query, with the two parts of its latency timed apart.
+#[derive(Debug)]
+pub struct SearchResult {
+    pub hits: Vec<Hit>,
+    /// Embedding the query.
+    pub encode_time: Duration,
+    /// Scoring every stored vector.
+    pub scan_time: Duration,
+}
+
+/// An opened index ready to answer queries: the store for chunk text and
+/// all vectors in memory.
+pub struct Searcher<'a> {
+    store: Store,
+    vectors: Vec<f32>,
+    dim: usize,
+    embedder: &'a Embedder,
+}
+
+impl<'a> Searcher<'a> {
+    /// Open the index in `index_dir`. It must have been built with exactly
+    /// the settings in `current` (same model, weights and chunking).
+    pub fn open(
+        index_dir: &Path,
+        embedder: &'a Embedder,
+        current: &IndexMeta,
+    ) -> Result<Self, SearchError> {
+        let store = Store::open(index_dir)?;
+        let meta = store.check_meta(current)?;
+        let vectors = read_vectors(&index_dir.join(VECTORS_FILE), meta.dim)?;
+        let rows = vectors.len() / meta.dim;
+        let chunks = store.chunk_count()?;
+        if rows != chunks {
+            return Err(StoreError::Corrupt(format!("{rows} vectors for {chunks} chunks")).into());
+        }
+        Ok(Self {
+            store,
+            vectors,
+            dim: meta.dim,
+            embedder,
+        })
+    }
+
+    /// The store, to look up the chunks and documents of hits.
+    pub fn store(&self) -> &Store {
+        &self.store
+    }
+
+    /// The `k` chunks closest in meaning to `query`.
+    pub fn search(&self, query: &str, k: usize) -> Result<SearchResult, SearchError> {
+        let started = Instant::now();
+        let vector = self.embedder.embed_query(query)?;
+        let encode_time = started.elapsed();
+        let started = Instant::now();
+        let hits = top_k(&vector, &self.vectors, self.dim, k);
+        Ok(SearchResult {
+            hits,
+            encode_time,
+            scan_time: started.elapsed(),
+        })
+    }
+}
 
 /// The `k` rows of `vectors` (row-major, `dim` floats each) with the
 /// highest dot product with `query`, best first. Vectors are unit length,
