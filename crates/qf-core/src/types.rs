@@ -28,6 +28,16 @@ impl Format {
             Self::Txt => "txt",
         }
     }
+
+    /// Inverse of [`Format::as_str`].
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "pdf" => Some(Self::Pdf),
+            "docx" => Some(Self::Docx),
+            "txt" => Some(Self::Txt),
+            _ => None,
+        }
+    }
 }
 
 /// One indexed source file.
@@ -40,4 +50,19 @@ pub struct Document {
     pub hash: [u8; 32],
     /// Modification time in seconds since the Unix epoch.
     pub mtime: i64,
+}
+
+/// One stored passage of a document. Its embedding is row `id` of the
+/// vector file.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Chunk {
+    pub id: u32,
+    pub doc_id: u32,
+    /// Position of the chunk within its document, from 0.
+    pub ord: u32,
+    pub text: String,
+    /// `[char_start, char_end)` in characters of the extracted text.
+    pub char_start: usize,
+    pub char_end: usize,
+    pub page: Option<u32>,
 }

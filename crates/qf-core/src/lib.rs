@@ -6,6 +6,7 @@ pub mod embed;
 pub mod format;
 pub mod ingest;
 pub mod prepare;
+pub mod store;
 pub mod types;
 
-pub use types::{Document, Format};
+pub use types::{Chunk, Document, Format};
