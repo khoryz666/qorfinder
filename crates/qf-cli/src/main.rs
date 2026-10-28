@@ -1,3 +1,8 @@
+mod cli;
+
 fn main() {
-    println!("qorfinder {}", env!("CARGO_PKG_VERSION"));
+    if let Err(err) = cli::run() {
+        eprintln!("error: {err:#}");
+        std::process::exit(1);
+    }
 }
