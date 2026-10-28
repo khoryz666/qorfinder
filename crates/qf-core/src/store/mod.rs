@@ -9,7 +9,7 @@ pub use vectors::{VectorWriter, read_vectors};
 
 use rusqlite::{Connection, OptionalExtension, params};
 
-use crate::{Chunk, Document, Format};
+use crate::{Chunk, Document, Format, IndexMeta};
 
 /// SQLite database inside the index folder.
 pub const DB_FILE: &str = "index.sqlite";
@@ -24,6 +24,15 @@ pub enum StoreError {
     Io(#[from] std::io::Error),
     #[error("index is damaged: {0}")]
     Corrupt(String),
+    #[error(
+        "index was built with {field} {built}, but this run uses {current}; \
+         re-run `qorfinder index` to rebuild it"
+    )]
+    Mismatch {
+        field: &'static str,
+        built: String,
+        current: String,
+    },
 }
 
 const SCHEMA: &str = "
@@ -33,6 +42,10 @@ CREATE TABLE documents (
     format TEXT NOT NULL,
     hash   BLOB NOT NULL,
     mtime  INTEGER NOT NULL
+);
+CREATE TABLE meta (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
 );
 CREATE TABLE chunks (
     id         INTEGER PRIMARY KEY,
@@ -79,6 +92,70 @@ impl Store {
         Ok(Self {
             conn: Connection::open(path)?,
         })
+    }
+
+    /// Record the settings the index is being built with.
+    pub fn write_meta(&self, meta: &IndexMeta) -> Result<(), StoreError> {
+        let rows = [
+            ("model_id", meta.model_id.clone()),
+            ("model_rev", meta.model_rev.clone()),
+            ("dim", meta.dim.to_string()),
+            ("max_tokens", meta.max_tokens.to_string()),
+            ("overlap", meta.overlap.to_string()),
+        ];
+        for (key, value) in rows {
+            self.conn.execute(
+                "INSERT OR REPLACE INTO meta (key, value) VALUES (?1, ?2)",
+                params![key, value],
+            )?;
+        }
+        Ok(())
+    }
+
+    pub fn read_meta(&self) -> Result<IndexMeta, StoreError> {
+        let get = |key: &str| -> Result<String, StoreError> {
+            self.conn
+                .query_row("SELECT value FROM meta WHERE key = ?1", [key], |r| r.get(0))
+                .optional()?
+                .ok_or_else(|| StoreError::Corrupt(format!("missing meta {key}")))
+        };
+        let number = |key: &str| -> Result<usize, StoreError> {
+            get(key)?
+                .parse()
+                .map_err(|_| StoreError::Corrupt(format!("meta {key} is not a number")))
+        };
+        Ok(IndexMeta {
+            model_id: get("model_id")?,
+            model_rev: get("model_rev")?,
+            dim: number("dim")?,
+            max_tokens: number("max_tokens")?,
+            overlap: number("overlap")?,
+        })
+    }
+
+    /// Fail unless the index was built with exactly `current`'s settings.
+    pub fn check_meta(&self, current: &IndexMeta) -> Result<IndexMeta, StoreError> {
+        let built = self.read_meta()?;
+        let fields = [
+            ("model", &built.model_id, &current.model_id),
+            ("model revision", &built.model_rev, &current.model_rev),
+        ];
+        for (field, b, c) in fields {
+            if b != c {
+                return Err(mismatch(field, b, c));
+            }
+        }
+        let numbers = [
+            ("dimension", built.dim, current.dim),
+            ("max_tokens", built.max_tokens, current.max_tokens),
+            ("overlap", built.overlap, current.overlap),
+        ];
+        for (field, b, c) in numbers {
+            if b != c {
+                return Err(mismatch(field, b, c));
+            }
+        }
+        Ok(built)
     }
 
     pub fn insert_document(&self, doc: &Document) -> Result<(), StoreError> {
@@ -178,6 +255,14 @@ impl Store {
             .conn
             .query_row("SELECT COUNT(*) FROM chunks", [], |r| r.get(0))?;
         Ok(n as usize)
+    }
+}
+
+fn mismatch(field: &'static str, built: impl ToString, current: impl ToString) -> StoreError {
+    StoreError::Mismatch {
+        field,
+        built: built.to_string(),
+        current: current.to_string(),
     }
 }
 

@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 
-use qf_core::store::{Store, VectorWriter, read_vectors};
-use qf_core::{Chunk, Document, Format};
+use qf_core::store::{Store, StoreError, VectorWriter, read_vectors};
+use qf_core::{Chunk, Document, Format, IndexMeta};
 
 fn document(id: u32) -> Document {
     Document {
@@ -92,4 +92,70 @@ fn truncated_vector_file_is_rejected() {
     let path = dir.path().join("vectors.f32");
     std::fs::write(&path, [0u8; 13]).unwrap();
     assert!(read_vectors(&path, 3).is_err());
+}
+
+fn meta() -> IndexMeta {
+    IndexMeta {
+        model_id: "sentence-transformers/all-MiniLM-L6-v2".into(),
+        model_rev: "53aa5117".into(),
+        dim: 384,
+        max_tokens: 200,
+        overlap: 40,
+    }
+}
+
+#[test]
+fn meta_round_trips_and_matching_settings_pass() {
+    let dir = tempfile::tempdir().unwrap();
+    Store::create(dir.path())
+        .unwrap()
+        .write_meta(&meta())
+        .unwrap();
+    let store = Store::open(dir.path()).unwrap();
+    assert_eq!(store.read_meta().unwrap(), meta());
+    assert_eq!(store.check_meta(&meta()).unwrap(), meta());
+}
+
+#[test]
+fn index_built_with_other_settings_is_refused() {
+    let dir = tempfile::tempdir().unwrap();
+    Store::create(dir.path())
+        .unwrap()
+        .write_meta(&meta())
+        .unwrap();
+    let store = Store::open(dir.path()).unwrap();
+
+    let other_chunking = IndexMeta {
+        max_tokens: 120,
+        ..meta()
+    };
+    let err = store.check_meta(&other_chunking).unwrap_err();
+    assert!(matches!(
+        err,
+        StoreError::Mismatch {
+            field: "max_tokens",
+            ..
+        }
+    ));
+    assert!(
+        err.to_string()
+            .contains("max_tokens 200, but this run uses 120"),
+        "{err}"
+    );
+
+    let other_model = IndexMeta {
+        model_id: "BAAI/bge-small-en-v1.5".into(),
+        ..meta()
+    };
+    assert!(matches!(
+        store.check_meta(&other_model),
+        Err(StoreError::Mismatch { field: "model", .. })
+    ));
+}
+
+#[test]
+fn index_without_meta_is_corrupt() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = Store::create(dir.path()).unwrap();
+    assert!(matches!(store.read_meta(), Err(StoreError::Corrupt(_))));
 }

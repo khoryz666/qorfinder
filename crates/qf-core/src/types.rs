@@ -66,3 +66,17 @@ pub struct Chunk {
     pub char_end: usize,
     pub page: Option<u32>,
 }
+
+/// Settings an index was built with. Search refuses an index whose
+/// settings differ from the running program's, because its vectors or
+/// chunks would not be comparable.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IndexMeta {
+    pub model_id: String,
+    /// SHA-256 of the model weights, so a changed weights file is caught
+    /// even under the same model id.
+    pub model_rev: String,
+    pub dim: usize,
+    pub max_tokens: usize,
+    pub overlap: usize,
+}

@@ -9,4 +9,4 @@ pub mod prepare;
 pub mod store;
 pub mod types;
 
-pub use types::{Chunk, Document, Format};
+pub use types::{Chunk, Document, Format, IndexMeta};
