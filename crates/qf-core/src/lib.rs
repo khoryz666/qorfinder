@@ -4,6 +4,7 @@
 pub mod chunk;
 pub mod embed;
 pub mod format;
+pub mod index;
 pub mod ingest;
 pub mod prepare;
 pub mod store;

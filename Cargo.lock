@@ -1569,6 +1569,7 @@ dependencies = [
  "candle-transformers",
  "docx-rs",
  "lopdf",
+ "rayon",
  "rusqlite",
  "serde_json",
  "sha2",
