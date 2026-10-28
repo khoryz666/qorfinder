@@ -1,0 +1,14 @@
+/target
+/data/cuad
+/models
+/doc
+.cache/
+.env
+.DS_Store
+Thumbs.db
+*.log
+.direnv/
+result
+result-*
+__pycache__/
+.venv/
