@@ -11,6 +11,11 @@ fn model_dir() -> PathBuf {
 fn loads_minilm() {
     let embedder = Embedder::load(&model_dir()).unwrap();
     assert_eq!(embedder.dim(), 384);
+    // The weights pinned in scripts/fetch_model.py.
+    assert_eq!(
+        embedder.revision(),
+        "53aa51172d142c89d9012cce15ae4d6cc0ca6895895114379cacb4fab128d9db"
+    );
 }
 
 #[test]
