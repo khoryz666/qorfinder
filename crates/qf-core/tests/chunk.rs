@@ -122,7 +122,7 @@ fn packs_whole_units_up_to_max_tokens() {
 #[test]
 fn spans_are_character_offsets() {
     let text = "Caf\u{e9} na\u{ef}ve r\u{e9}sum\u{e9}.\n\n\u{a7} 2 Fees due.";
-    let spans = chunk_text(text, &Words, config(3, 0)).unwrap();
+    let spans = chunk_text(text, &Words, config(4, 0)).unwrap();
     assert_eq!(
         spans,
         [Span { start: 0, end: 18 }, Span { start: 20, end: 33 }]
@@ -137,4 +137,28 @@ fn empty_text_has_no_chunks() {
             .unwrap()
             .is_empty()
     );
+}
+
+#[test]
+fn long_unit_is_cut_with_overlapping_windows() {
+    let text = "Intro.\n\nw0 w1 w2 w3 w4 w5 w6 w7 w8 w9\n\nOutro.";
+    assert_eq!(
+        chunk_strings(text, config(4, 1)),
+        [
+            "Intro.",
+            "w0 w1 w2 w3",
+            "w3 w4 w5 w6",
+            "w6 w7 w8 w9",
+            "Outro."
+        ]
+    );
+    assert_eq!(
+        chunk_strings("w0 w1 w2 w3 w4", config(4, 2)),
+        ["w0 w1 w2 w3", "w2 w3 w4"]
+    );
+}
+
+#[test]
+fn overlap_must_be_smaller_than_max_tokens() {
+    assert!(chunk_text("a b c", &Words, config(4, 4)).is_err());
 }
