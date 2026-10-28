@@ -59,3 +59,32 @@ fn padding_does_not_change_an_embedding() {
     assert!(dot(&alone, &batched[0]) > 0.9999);
     assert!(embedder.embed(&[]).unwrap().is_empty());
 }
+
+/// Correctness check for the report: candle must reproduce Python
+/// sentence-transformers. The reference vectors come from
+/// scripts/reference_embeddings.py.
+#[test]
+#[ignore = "needs models/ from scripts/fetch_model.py"]
+fn embeddings_match_sentence_transformers() {
+    let path =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/minilm_reference.json");
+    let reference: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+    let sentences: Vec<&str> = reference["sentences"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|s| s.as_str().unwrap())
+        .collect();
+    let expected: Vec<Vec<f32>> = serde_json::from_value(reference["embeddings"].clone()).unwrap();
+
+    let actual = Embedder::load(&model_dir())
+        .unwrap()
+        .embed(&sentences)
+        .unwrap();
+    for ((sentence, a), e) in sentences.iter().zip(&actual).zip(&expected) {
+        let cosine = dot(a, e) / (dot(a, a).sqrt() * dot(e, e).sqrt());
+        println!("cosine {cosine:.6}  {sentence}");
+        assert!(cosine > 0.99, "cosine {cosine} for {sentence:?}");
+    }
+}
