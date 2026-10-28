@@ -113,6 +113,21 @@ def write_selection(
             f.write(f"{category}\t{counts[category]}\t{descriptions[category]}\n")
 
 
+def write_spans(out_dir: Path, sample: list[dict], kept: list[str]) -> None:
+    """spans.tsv: one line per annotated span of a kept category in a
+    sampled contract, as category, file, char_start, char_end (end
+    exclusive, in characters). Judgments stay at span level, so the chunk
+    size can change without redoing them."""
+    lines = 0
+    with (out_dir / "spans.tsv").open("w", encoding="utf-8", newline="\n") as f:
+        for contract in sample:
+            for category in kept:
+                for start, end in sorted(contract["spans"].get(category, [])):
+                    f.write(f"{category}\t{contract['file']}\t{start}\t{end}\n")
+                    lines += 1
+    print(f"wrote {lines} spans to {out_dir / 'spans.tsv'}")
+
+
 def print_counts(counts: dict[str, int], kept: list[str], n: int, max_share: float) -> None:
     print(f"\nN = {n} contracts, X = {max_share:.0%} (at most {int(max_share * n)})")
     print(f"{'category':<40} {'contracts':>9}  kept")
@@ -144,6 +159,7 @@ def main() -> int:
     sample, counts, kept = sample_and_count(contracts, args.n, args.seed, args.x)
     print_counts(counts, kept, args.n, args.x)
     write_selection(args.testset, sample, counts, kept, descriptions)
+    write_spans(args.testset, sample, kept)
     return 0
 
 
