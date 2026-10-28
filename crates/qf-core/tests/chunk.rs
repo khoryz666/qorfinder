@@ -1,7 +1,8 @@
 use std::ops::Range;
 
 use qf_core::chunk::{
-    ChunkConfig, Span, Tokenize, TokenizeError, chunk_text, is_clause_start, split_units,
+    ChunkConfig, ModelTokenizer, Span, Tokenize, TokenizeError, chunk_text, is_clause_start,
+    split_units,
 };
 
 /// One token per whitespace-separated word, so tests need no model files.
@@ -211,4 +212,30 @@ fn rejoined_chunks_recover_the_source() {
         }
         assert_eq!(rebuilt, text, "config {cfg:?}");
     }
+}
+
+fn model_tokenizer() -> ModelTokenizer {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../models/all-MiniLM-L6-v2/tokenizer.json");
+    ModelTokenizer::from_file(&path).expect("run scripts/fetch_model.py first")
+}
+
+#[test]
+#[ignore = "needs models/ from scripts/fetch_model.py"]
+fn model_tokenizer_offsets_point_into_the_text() {
+    let text = "The Licensee shall pay royalties of 5% quarterly.";
+    let offsets = model_tokenizer().token_offsets(text).unwrap();
+    let tokens: Vec<&str> = offsets.iter().map(|r| &text[r.clone()]).collect();
+    assert_eq!(tokens.first(), Some(&"The"));
+    assert!(tokens.contains(&"royalties"));
+    assert_eq!(tokens.last(), Some(&"."));
+}
+
+#[test]
+#[ignore = "needs models/ from scripts/fetch_model.py"]
+fn model_tokenizer_is_not_truncated() {
+    // tokenizer.json ships with truncation at 128 tokens; counting must not
+    // stop there.
+    let text = "word ".repeat(300);
+    assert_eq!(model_tokenizer().token_offsets(&text).unwrap().len(), 300);
 }

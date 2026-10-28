@@ -1,9 +1,11 @@
 //! Clause-aware chunking of normalised document text.
 
+mod tokenizer;
 mod units;
 
 use std::ops::Range;
 
+pub use tokenizer::ModelTokenizer;
 pub use units::{is_clause_start, split_units};
 
 pub type TokenizeError = Box<dyn std::error::Error + Send + Sync>;
