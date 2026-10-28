@@ -6,6 +6,11 @@ use crate::Format;
 /// buffers the whole file, and no single legal document needs 50 MB.
 pub const MAX_FILE_SIZE_BYTES: u64 = 50 * 1024 * 1024;
 
+/// A PDF averaging fewer visible characters per page than this is treated
+/// as a scan without a text layer. Even a sparse signature page of a real
+/// contract has more text than this.
+pub const MIN_PDF_CHARS_PER_PAGE: usize = 100;
+
 #[derive(Debug, thiserror::Error)]
 pub enum ParseError {
     #[error("cannot read file: {0}")]
@@ -16,6 +21,8 @@ pub enum ParseError {
     Format(String),
     #[error("encrypted")]
     Encrypted,
+    #[error("no text layer")]
+    NoTextLayer,
 }
 
 /// Text pulled out of one file.
@@ -98,6 +105,10 @@ fn extract_pdf_bytes(bytes: &[u8]) -> Result<Extracted, ParseError> {
         let text = doc.extract_text(&[page_no]).unwrap_or_default();
         chars += text.chars().count();
         out.text.push_str(&text);
+    }
+    let visible = out.text.chars().filter(|c| !c.is_whitespace()).count();
+    if visible < MIN_PDF_CHARS_PER_PAGE * out.pages.len().max(1) {
+        return Err(ParseError::NoTextLayer);
     }
     Ok(out)
 }

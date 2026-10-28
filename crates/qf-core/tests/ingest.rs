@@ -161,10 +161,12 @@ fn write_pdf(path: &std::path::Path, pages: &[&str]) {
     doc.save(path).unwrap();
 }
 
-const PAGE_ONE: &str =
-    "1. Confidentiality. The Receiving Party shall keep all Confidential Information secret.";
-const PAGE_TWO: &str =
-    "2. Term. This Agreement remains in force for two years from the Effective Date.";
+// Each page needs at least MIN_PDF_CHARS_PER_PAGE visible characters, or it
+// looks like a scan.
+const PAGE_ONE: &str = "1. Confidentiality. The Receiving Party shall keep all Confidential \
+    Information secret and shall not disclose it to any third party without prior consent.";
+const PAGE_TWO: &str = "2. Term. This Agreement remains in force for two years from the \
+    Effective Date unless terminated earlier by either party on thirty days written notice.";
 
 #[test]
 fn extracts_pdf_text_with_page_offsets() {
@@ -229,4 +231,15 @@ fn pdf_needing_a_password_is_reported_as_encrypted() {
     let err = extract(&path, Format::Pdf).unwrap_err();
     assert!(matches!(err, ParseError::Encrypted), "got {err:?}");
     assert_eq!(err.to_string(), "encrypted");
+}
+
+#[test]
+fn pdf_with_almost_no_text_is_reported_as_scanned() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("scan.pdf");
+    // Two pages but only one page's worth of text in total.
+    write_pdf(&path, &[PAGE_ONE, "Page 2"]);
+    let err = extract(&path, Format::Pdf).unwrap_err();
+    assert!(matches!(err, ParseError::NoTextLayer), "got {err:?}");
+    assert_eq!(err.to_string(), "no text layer");
 }
