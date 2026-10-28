@@ -3,6 +3,7 @@
 
 pub mod chunk;
 pub mod ingest;
+pub mod prepare;
 pub mod types;
 
 pub use types::{Document, Format};
