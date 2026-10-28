@@ -1,7 +1,11 @@
 //! The on-disk index: SQLite for documents and chunks, one flat file for
 //! the vectors.
 
+mod vectors;
+
 use std::path::{Path, PathBuf};
+
+pub use vectors::{VectorWriter, read_vectors};
 
 use rusqlite::{Connection, OptionalExtension, params};
 
@@ -9,6 +13,8 @@ use crate::{Chunk, Document, Format};
 
 /// SQLite database inside the index folder.
 pub const DB_FILE: &str = "index.sqlite";
+/// Embedding vectors inside the index folder.
+pub const VECTORS_FILE: &str = "vectors.f32";
 
 #[derive(Debug, thiserror::Error)]
 pub enum StoreError {

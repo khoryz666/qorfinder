@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use qf_core::store::Store;
+use qf_core::store::{Store, VectorWriter, read_vectors};
 use qf_core::{Chunk, Document, Format};
 
 fn document(id: u32) -> Document {
@@ -65,4 +65,31 @@ fn opening_a_missing_index_fails() {
         err.to_string().contains("run `qorfinder index` first"),
         "{err}"
     );
+}
+
+#[test]
+fn vectors_round_trip_as_little_endian_rows() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("vectors.f32");
+    let mut writer = VectorWriter::create(&path, 3).unwrap();
+    writer.push(&[1.0, -2.5, 0.0]).unwrap();
+    writer.push(&[f32::MIN_POSITIVE, 3.25, -0.0]).unwrap();
+    assert!(writer.push(&[1.0]).is_err());
+    assert_eq!(writer.finish().unwrap(), 2);
+
+    let bytes = std::fs::read(&path).unwrap();
+    assert_eq!(bytes.len(), 2 * 3 * 4);
+    assert_eq!(&bytes[4..8], &(-2.5f32).to_le_bytes());
+    assert_eq!(
+        read_vectors(&path, 3).unwrap(),
+        [1.0, -2.5, 0.0, f32::MIN_POSITIVE, 3.25, -0.0]
+    );
+}
+
+#[test]
+fn truncated_vector_file_is_rejected() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("vectors.f32");
+    std::fs::write(&path, [0u8; 13]).unwrap();
+    assert!(read_vectors(&path, 3).is_err());
 }
