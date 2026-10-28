@@ -5,9 +5,10 @@ use clap::{Args, Parser, Subcommand};
 use qf_core::chunk::{ChunkConfig, ModelTokenizer};
 use qf_core::embed::Embedder;
 use qf_core::format::snippet;
-use qf_core::index::build_index;
+use qf_core::index::{build_index, index_meta};
 use qf_core::ingest::{Skipped, walk};
 use qf_core::prepare::prepare;
+use qf_core::search::Searcher;
 
 use crate::progress::Bars;
 
@@ -48,6 +49,18 @@ enum Command {
         /// Print the chunks of every file instead of indexing them
         #[arg(long)]
         dry_run: bool,
+
+        #[command(flatten)]
+        chunking: ChunkArgs,
+    },
+    /// Find the passages closest in meaning to a query
+    Search {
+        /// What to look for, in plain English
+        query: String,
+
+        /// Number of passages to return
+        #[arg(short, long, default_value_t = 10)]
+        k: usize,
 
         #[command(flatten)]
         chunking: ChunkArgs,
@@ -94,6 +107,10 @@ pub fn run() -> Result<()> {
             let index_dir = cli.index_dir.unwrap_or_else(default_index_dir);
             index(&folder, &index_dir, &cli.model_dir, config)
         }
+        Command::Search { query, k, chunking } => {
+            let index_dir = cli.index_dir.unwrap_or_else(default_index_dir);
+            search(&query, k, &index_dir, &cli.model_dir, chunking.config()?)
+        }
     }
 }
 
@@ -134,6 +151,45 @@ fn index(folder: &Path, index_dir: &Path, model_dir: &Path, config: ChunkConfig)
         report.chunks as f64 / embed_secs.max(f64::EPSILON),
     );
     println!("index saved to {}", index_dir.display());
+    Ok(())
+}
+
+fn search(
+    query: &str,
+    k: usize,
+    index_dir: &Path,
+    model_dir: &Path,
+    config: ChunkConfig,
+) -> Result<()> {
+    let embedder = load_embedder(model_dir)?;
+    let searcher = Searcher::open(index_dir, &embedder, &index_meta(&embedder, config))?;
+    let result = searcher.search(query, k)?;
+    let store = searcher.store();
+    for (rank, hit) in result.hits.iter().enumerate() {
+        let chunk = store
+            .chunk(hit.chunk_id)?
+            .with_context(|| format!("chunk {} missing from the index", hit.chunk_id))?;
+        let doc = store
+            .document(chunk.doc_id)?
+            .with_context(|| format!("document {} missing from the index", chunk.doc_id))?;
+        let page = chunk.page.map_or(String::new(), |n| format!(" p.{n}"));
+        println!(
+            "{:>2}. {:.4}  {}{page} [{}..{}]\n    {}",
+            rank + 1,
+            hit.score,
+            doc.path.display(),
+            chunk.char_start,
+            chunk.char_end,
+            snippet(&chunk.text, 240)
+        );
+    }
+    println!(
+        "{} result(s) in {:.1} ms (encode {:.1} ms, scan {:.1} ms)",
+        result.hits.len(),
+        (result.encode_time + result.scan_time).as_secs_f64() * 1e3,
+        result.encode_time.as_secs_f64() * 1e3,
+        result.scan_time.as_secs_f64() * 1e3,
+    );
     Ok(())
 }
 
