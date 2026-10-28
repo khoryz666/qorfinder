@@ -4,10 +4,10 @@
 The Rust embedder must reproduce the original model: the test
 `embeddings_match_sentence_transformers` embeds the same sentences with
 candle and checks every cosine similarity is above 0.99 against the vectors
-this script writes. Needs `pip install sentence-transformers` and the
-network once; QorFinder itself needs neither.
+this script writes. Needs sentence-transformers and the network once;
+QorFinder itself needs neither.
 
-Usage: python3 scripts/reference_embeddings.py
+Usage: nix develop .#reference --command python3 scripts/reference_embeddings.py
 """
 
 import json

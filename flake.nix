@@ -73,5 +73,13 @@
             (pkgs.python3.withPackages (ps: [ (ranx ps) ps.scipy ]))
           ];
         };
+
+        # `nix develop .#reference` regenerates the reference embeddings
+        # with sentence-transformers (pulls in PyTorch, so kept separate).
+        devShells.reference = pkgs.mkShell {
+          packages = [
+            (pkgs.python3.withPackages (ps: [ ps.sentence-transformers ]))
+          ];
+        };
       });
 }
