@@ -2,10 +2,12 @@
 
 mod extract;
 mod hash;
+mod normalize;
 mod walk;
 
 pub use extract::{Extracted, MAX_FILE_SIZE_BYTES, MIN_PDF_CHARS_PER_PAGE, ParseError, extract};
 pub use hash::hash_file;
+pub use normalize::{Normalized, normalize};
 pub use walk::{FoundFile, walk};
 
 use std::path::PathBuf;
