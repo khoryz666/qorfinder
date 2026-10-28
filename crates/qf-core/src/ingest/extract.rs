@@ -14,6 +14,8 @@ pub enum ParseError {
     TooLarge { size: u64, limit: u64 },
     #[error("cannot parse file: {0}")]
     Format(String),
+    #[error("encrypted")]
+    Encrypted,
 }
 
 /// Text pulled out of one file.
@@ -47,10 +49,10 @@ pub fn extract(path: &Path, format: Format) -> Result<Extracted, ParseError> {
     }
     match format {
         Format::Txt => extract_txt(path),
-        Format::Pdf | Format::Docx => Err(ParseError::Format(format!(
-            "{} extraction is not supported yet",
-            format.as_str()
-        ))),
+        Format::Pdf => extract_pdf(path),
+        Format::Docx => Err(ParseError::Format(
+            "docx extraction is not supported yet".into(),
+        )),
     }
 }
 
@@ -64,4 +66,38 @@ fn extract_txt(path: &Path) -> Result<Extracted, ParseError> {
         text,
         pages: Vec::new(),
     })
+}
+
+/// PDF text, one page at a time so every page's start offset is known.
+/// Pages are separated by a paragraph break. lopdf can panic on malformed
+/// files, so the whole parse runs under `catch_unwind` and a panic becomes
+/// an ordinary parse error.
+fn extract_pdf(path: &Path) -> Result<Extracted, ParseError> {
+    let bytes = std::fs::read(path)?;
+    std::panic::catch_unwind(|| extract_pdf_bytes(&bytes))
+        .unwrap_or_else(|_| Err(ParseError::Format("pdf parser panicked".into())))
+}
+
+fn extract_pdf_bytes(bytes: &[u8]) -> Result<Extracted, ParseError> {
+    let doc = lopdf::Document::load_mem(bytes).map_err(|e| ParseError::Format(e.to_string()))?;
+    // lopdf already tries the empty user password on load, so a document
+    // that is still encrypted here needs a password we do not have.
+    if doc.is_encrypted() {
+        return Err(ParseError::Encrypted);
+    }
+    let mut out = Extracted::default();
+    let mut chars = 0;
+    for page_no in doc.get_pages().into_keys() {
+        if !out.text.is_empty() {
+            out.text.push_str("\n\n");
+            chars += 2;
+        }
+        out.pages.push((chars, page_no));
+        // A page whose content stream cannot be decoded contributes no text
+        // rather than failing the whole document.
+        let text = doc.extract_text(&[page_no]).unwrap_or_default();
+        chars += text.chars().count();
+        out.text.push_str(&text);
+    }
+    Ok(out)
 }

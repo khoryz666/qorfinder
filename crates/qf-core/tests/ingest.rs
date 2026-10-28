@@ -107,3 +107,126 @@ fn page_at_maps_offsets_to_pages() {
     assert_eq!(extracted.page_at(100), Some(2));
     assert_eq!(Extracted::default().page_at(0), None);
 }
+
+/// A one-page-per-string PDF built in memory, so tests need no fixture files.
+fn write_pdf(path: &std::path::Path, pages: &[&str]) {
+    use lopdf::content::{Content, Operation};
+    use lopdf::{Document, Object, Stream, dictionary};
+
+    let mut doc = Document::with_version("1.5");
+    let pages_id = doc.new_object_id();
+    let font_id = doc.add_object(dictionary! {
+        "Type" => "Font",
+        "Subtype" => "Type1",
+        "BaseFont" => "Courier",
+    });
+    let resources_id = doc.add_object(dictionary! {
+        "Font" => dictionary! { "F1" => font_id },
+    });
+    let mut kids = Vec::new();
+    for text in pages {
+        let content = Content {
+            operations: vec![
+                Operation::new("BT", vec![]),
+                Operation::new("Tf", vec!["F1".into(), 10.into()]),
+                Operation::new("Td", vec![50.into(), 700.into()]),
+                Operation::new("Tj", vec![Object::string_literal(*text)]),
+                Operation::new("ET", vec![]),
+            ],
+        };
+        let content_id = doc.add_object(Stream::new(dictionary! {}, content.encode().unwrap()));
+        let page_id = doc.add_object(dictionary! {
+            "Type" => "Page",
+            "Parent" => pages_id,
+            "Contents" => content_id,
+        });
+        kids.push(page_id.into());
+    }
+    let count = kids.len() as i64;
+    doc.objects.insert(
+        pages_id,
+        Object::Dictionary(dictionary! {
+            "Type" => "Pages",
+            "Kids" => kids,
+            "Count" => count,
+            "Resources" => resources_id,
+            "MediaBox" => vec![0.into(), 0.into(), 595.into(), 842.into()],
+        }),
+    );
+    let catalog_id = doc.add_object(dictionary! {
+        "Type" => "Catalog",
+        "Pages" => pages_id,
+    });
+    doc.trailer.set("Root", catalog_id);
+    doc.save(path).unwrap();
+}
+
+const PAGE_ONE: &str =
+    "1. Confidentiality. The Receiving Party shall keep all Confidential Information secret.";
+const PAGE_TWO: &str =
+    "2. Term. This Agreement remains in force for two years from the Effective Date.";
+
+#[test]
+fn extracts_pdf_text_with_page_offsets() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("a.pdf");
+    write_pdf(&path, &[PAGE_ONE, PAGE_TWO]);
+
+    let out = extract(&path, Format::Pdf).unwrap();
+    assert_eq!(out.pages.len(), 2);
+    assert_eq!(out.pages[0], (0, 1));
+    let (second_start, second_no) = out.pages[1];
+    assert_eq!(second_no, 2);
+    let second: String = out.text.chars().skip(second_start).collect();
+    assert!(second.contains("2. Term."), "page two was {second:?}");
+    let first: String = out.text.chars().take(second_start).collect();
+    assert!(
+        first.contains("1. Confidentiality."),
+        "page one was {first:?}"
+    );
+    assert!(!first.contains("2. Term."));
+}
+
+#[test]
+fn corrupt_pdf_is_a_parse_error() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("bad.pdf");
+    fs::write(&path, b"%PDF-1.5\nthis is not really a pdf").unwrap();
+    assert!(matches!(
+        extract(&path, Format::Pdf),
+        Err(ParseError::Format(_))
+    ));
+}
+
+#[test]
+fn pdf_needing_a_password_is_reported_as_encrypted() {
+    use lopdf::{Document, Object, dictionary};
+
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("locked.pdf");
+    write_pdf(&path, &[PAGE_ONE]);
+    // Add a standard security handler whose password hashes match no
+    // password, so the empty user password lopdf tries on load fails.
+    let mut doc = Document::load(&path).unwrap();
+    let encrypt_id = doc.add_object(dictionary! {
+        "Filter" => "Standard",
+        "V" => 1,
+        "R" => 2,
+        "O" => Object::string_literal(vec![1u8; 32]),
+        "U" => Object::string_literal(vec![2u8; 32]),
+        "P" => -4,
+    });
+    doc.trailer.set("Encrypt", encrypt_id);
+    doc.trailer.set(
+        "ID",
+        vec![
+            Object::string_literal(vec![3u8; 16]),
+            Object::string_literal(vec![3u8; 16]),
+        ],
+    );
+    doc.save(&path).unwrap();
+
+    let err = extract(&path, Format::Pdf).unwrap_err();
+    assert!(matches!(err, ParseError::Encrypted), "got {err:?}");
+    assert_eq!(err.to_string(), "encrypted");
+}
