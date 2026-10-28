@@ -162,3 +162,53 @@ fn long_unit_is_cut_with_overlapping_windows() {
 fn overlap_must_be_smaller_than_max_tokens() {
     assert!(chunk_text("a b c", &Words, config(4, 4)).is_err());
 }
+
+/// The "done when" check for the chunker: putting the chunks back together
+/// recovers every character of the source. Chunks are in order, every
+/// non-whitespace character falls inside one, and overlaps only repeat
+/// text that is already there.
+#[test]
+fn rejoined_chunks_recover_the_source() {
+    let mut text = String::new();
+    for clause in 1..=12 {
+        text.push_str(&format!("{clause}. Clause {clause} heading\n"));
+        for sub in ["a", "b", "c"] {
+            text.push_str(&format!("({sub}) The party shall"));
+            for word in 0..(clause * 3) {
+                text.push_str(&format!(" w{clause}{sub}{word}"));
+            }
+            text.push_str(";\n");
+        }
+        text.push('\n');
+    }
+    let text = text.trim_end();
+    let chars: Vec<char> = text.chars().collect();
+
+    for cfg in [config(20, 5), config(37, 0), config(200, 40)] {
+        let spans = chunk_text(text, &Words, cfg).unwrap();
+        let mut rebuilt = String::new();
+        let mut covered_to = 0;
+        let mut prev_start = 0;
+        for span in &spans {
+            assert!(span.start < span.end && span.end <= chars.len());
+            assert!(span.start >= prev_start, "chunks out of order");
+            prev_start = span.start;
+            if span.start > covered_to {
+                let gap: String = chars[covered_to..span.start].iter().collect();
+                assert!(gap.trim().is_empty(), "uncovered text {gap:?}");
+                rebuilt.push_str(&gap);
+            }
+            if span.end > covered_to {
+                rebuilt.extend(&chars[covered_to.max(span.start)..span.end]);
+                covered_to = span.end;
+            }
+            let words = chars[span.start..span.end]
+                .iter()
+                .collect::<String>()
+                .split_whitespace()
+                .count();
+            assert!(words <= cfg.max_tokens, "{words} tokens in one chunk");
+        }
+        assert_eq!(rebuilt, text, "config {cfg:?}");
+    }
+}
