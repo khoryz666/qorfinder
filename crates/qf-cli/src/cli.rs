@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
-use clap::{Parser, Subcommand};
+use clap::{Args, Parser, Subcommand};
 use qf_core::chunk::{ChunkConfig, ModelTokenizer};
 use qf_core::embed::Embedder;
 use qf_core::format::snippet;
@@ -49,14 +49,34 @@ enum Command {
         #[arg(long)]
         dry_run: bool,
 
-        /// Most tokens in one chunk
-        #[arg(long, default_value_t = ChunkConfig::default().max_tokens)]
-        max_tokens: usize,
-
-        /// Tokens shared by consecutive windows of an over-long paragraph
-        #[arg(long, default_value_t = ChunkConfig::default().overlap)]
-        overlap: usize,
+        #[command(flatten)]
+        chunking: ChunkArgs,
     },
+}
+
+/// Chunk settings. An index can only be searched with the settings it was
+/// built with.
+#[derive(Args)]
+struct ChunkArgs {
+    /// Most tokens in one chunk
+    #[arg(long, default_value_t = ChunkConfig::default().max_tokens)]
+    max_tokens: usize,
+
+    /// Tokens shared by consecutive windows of an over-long paragraph
+    #[arg(long, default_value_t = ChunkConfig::default().overlap)]
+    overlap: usize,
+}
+
+impl ChunkArgs {
+    fn config(&self) -> Result<ChunkConfig> {
+        if self.overlap >= self.max_tokens {
+            bail!("--overlap must be smaller than --max-tokens");
+        }
+        Ok(ChunkConfig {
+            max_tokens: self.max_tokens,
+            overlap: self.overlap,
+        })
+    }
 }
 
 pub fn run() -> Result<()> {
@@ -65,16 +85,9 @@ pub fn run() -> Result<()> {
         Command::Index {
             folder,
             dry_run,
-            max_tokens,
-            overlap,
+            chunking,
         } => {
-            if overlap >= max_tokens {
-                bail!("--overlap must be smaller than --max-tokens");
-            }
-            let config = ChunkConfig {
-                max_tokens,
-                overlap,
-            };
+            let config = chunking.config()?;
             if dry_run {
                 return dry_run_index(&folder, &cli.model_dir, config);
             }
