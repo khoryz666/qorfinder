@@ -30,8 +30,7 @@ fn documents_and_chunks_survive_reopening() {
     let dir = tempfile::tempdir().unwrap();
     {
         let mut store = Store::create(dir.path()).unwrap();
-        store.insert_document(&document(0)).unwrap();
-        store.insert_document(&document(1)).unwrap();
+        store.insert_documents(&[document(0), document(1)]).unwrap();
         store
             .insert_chunks(&[chunk(0, 0, 0), chunk(1, 0, 1), chunk(2, 1, 0)])
             .unwrap();
@@ -49,7 +48,7 @@ fn documents_and_chunks_survive_reopening() {
 fn create_replaces_an_existing_index() {
     let dir = tempfile::tempdir().unwrap();
     let mut store = Store::create(dir.path()).unwrap();
-    store.insert_document(&document(0)).unwrap();
+    store.insert_documents(&[document(0)]).unwrap();
     store.insert_chunks(&[chunk(0, 0, 0)]).unwrap();
     drop(store);
 

@@ -158,17 +158,24 @@ impl Store {
         Ok(built)
     }
 
-    pub fn insert_document(&self, doc: &Document) -> Result<(), StoreError> {
-        self.conn.execute(
-            "INSERT INTO documents (id, path, format, hash, mtime) VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![
-                doc.id,
-                doc.path.to_string_lossy(),
-                doc.format.as_str(),
-                doc.hash.as_slice(),
-                doc.mtime
-            ],
-        )?;
+    /// Insert many documents in one transaction.
+    pub fn insert_documents(&mut self, docs: &[Document]) -> Result<(), StoreError> {
+        let tx = self.conn.transaction()?;
+        {
+            let mut insert = tx.prepare(
+                "INSERT INTO documents (id, path, format, hash, mtime) VALUES (?1, ?2, ?3, ?4, ?5)",
+            )?;
+            for doc in docs {
+                insert.execute(params![
+                    doc.id,
+                    doc.path.to_string_lossy(),
+                    doc.format.as_str(),
+                    doc.hash.as_slice(),
+                    doc.mtime
+                ])?;
+            }
+        }
+        tx.commit()?;
         Ok(())
     }
 
