@@ -14,3 +14,4 @@ qf-core.workspace = true
 anyhow.workspace = true
 clap = { version = "4", features = ["derive", "env"] }
 dirs = "6"
+indicatif = "0.18"

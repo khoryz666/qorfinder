@@ -9,6 +9,8 @@ use qf_core::index::build_index;
 use qf_core::ingest::{Skipped, walk};
 use qf_core::prepare::prepare;
 
+use crate::progress::Bars;
+
 #[derive(Parser)]
 #[command(
     name = "qorfinder",
@@ -95,7 +97,14 @@ fn index(folder: &Path, index_dir: &Path, model_dir: &Path, config: ChunkConfig)
     }
     let embedder = load_embedder(model_dir)?;
     let tokenizer = load_tokenizer(model_dir)?;
-    let report = build_index(folder, index_dir, &embedder, &tokenizer, config, &())?;
+    let report = build_index(
+        folder,
+        index_dir,
+        &embedder,
+        &tokenizer,
+        config,
+        &Bars::default(),
+    )?;
     for s in &report.skipped {
         println!("skipped {}: {}", s.path.display(), s.reason);
     }
