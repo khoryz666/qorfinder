@@ -34,6 +34,26 @@ pub struct IndexReport {
     pub total_time: Duration,
 }
 
+/// The two long stages of an indexing run.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Stage {
+    /// Extracting and chunking files; counted in files.
+    Preparing,
+    /// Embedding chunks; counted in chunks.
+    Embedding,
+}
+
+/// Receives indexing progress, for a progress bar in the CLI or the UI.
+/// Methods may be called from several threads at once.
+pub trait Progress: Sync {
+    fn start(&self, _stage: Stage, _total: usize) {}
+    fn advance(&self, _done: usize) {}
+    fn finish(&self, _stage: Stage) {}
+}
+
+/// No progress reporting.
+impl Progress for () {}
+
 /// The settings an index built now with `embedder` and `config` records.
 pub fn index_meta(embedder: &Embedder, config: ChunkConfig) -> IndexMeta {
     IndexMeta {
@@ -54,9 +74,11 @@ pub fn build_index(
     embedder: &Embedder,
     tokenizer: &(impl Tokenize + Sync),
     config: ChunkConfig,
+    progress: &impl Progress,
 ) -> Result<IndexReport, IndexError> {
     let started = Instant::now();
     let (files, mut skipped) = walk(folder);
+    progress.start(Stage::Preparing, files.len());
     let prepared: Vec<_> = files
         .into_par_iter()
         .map(|file| {
@@ -67,9 +89,11 @@ pub fn build_index(
                         .map(|passages| (hash, passages))
                         .map_err(|e| e.to_string())
                 });
+            progress.advance(1);
             (file, result)
         })
         .collect();
+    progress.finish(Stage::Preparing);
 
     // Number documents and chunks in walk order; chunk ids are also rows of
     // the vector file.
@@ -111,13 +135,16 @@ pub fn build_index(
     let mut store = Store::create(index_dir)?;
     let embed_started = Instant::now();
     let mut vectors = VectorWriter::create(&index_dir.join(VECTORS_FILE), embedder.dim())?;
+    progress.start(Stage::Embedding, chunks.len());
     for batch in chunks.chunks(BATCH_SIZE) {
         let texts: Vec<&str> = batch.iter().map(|c| c.text.as_str()).collect();
         for vector in embedder.embed(&texts)? {
             vectors.push(&vector)?;
         }
+        progress.advance(batch.len());
     }
     vectors.finish()?;
+    progress.finish(Stage::Embedding);
     let embed_time = embed_started.elapsed();
 
     store.insert_documents(&documents)?;

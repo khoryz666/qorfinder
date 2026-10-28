@@ -3,11 +3,40 @@ use std::path::PathBuf;
 
 use qf_core::chunk::{ChunkConfig, ModelTokenizer};
 use qf_core::embed::Embedder;
-use qf_core::index::{build_index, index_meta};
+use std::sync::Mutex;
+
+use qf_core::index::{Progress, Stage, build_index, index_meta};
 use qf_core::store::{Store, VECTORS_FILE, read_vectors};
 
 fn model_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../models/all-MiniLM-L6-v2")
+}
+
+/// Records progress events, summing `advance` calls per stage.
+#[derive(Default)]
+struct Recorder {
+    events: Mutex<Vec<String>>,
+    done: Mutex<usize>,
+}
+
+impl Progress for Recorder {
+    fn start(&self, stage: Stage, total: usize) {
+        *self.done.lock().unwrap() = 0;
+        self.events
+            .lock()
+            .unwrap()
+            .push(format!("start {stage:?} {total}"));
+    }
+    fn advance(&self, done: usize) {
+        *self.done.lock().unwrap() += done;
+    }
+    fn finish(&self, stage: Stage) {
+        let done = *self.done.lock().unwrap();
+        self.events
+            .lock()
+            .unwrap()
+            .push(format!("done {stage:?} {done}"));
+    }
 }
 
 #[test]
@@ -34,7 +63,16 @@ fn indexes_a_folder_and_skips_bad_files() {
         max_tokens: 12,
         overlap: 2,
     };
-    let report = build_index(docs.path(), index_dir.path(), &embedder, &tokenizer, config).unwrap();
+    let progress = Recorder::default();
+    let report = build_index(
+        docs.path(),
+        index_dir.path(),
+        &embedder,
+        &tokenizer,
+        config,
+        &progress,
+    )
+    .unwrap();
 
     assert_eq!(report.documents, 2);
     assert_eq!(report.skipped.len(), 1);
@@ -57,6 +95,16 @@ fn indexes_a_folder_and_skips_bad_files() {
     let first_nda_chunk = store.chunk(1).unwrap().unwrap();
     assert_eq!((first_nda_chunk.doc_id, first_nda_chunk.ord), (1, 0));
     assert!(first_nda_chunk.text.starts_with("1. Confidentiality"));
+
+    assert_eq!(
+        *progress.events.lock().unwrap(),
+        [
+            "start Preparing 3".to_string(),
+            "done Preparing 3".to_string(),
+            format!("start Embedding {}", report.chunks),
+            format!("done Embedding {}", report.chunks),
+        ]
+    );
 
     let vectors = read_vectors(&index_dir.path().join(VECTORS_FILE), 384).unwrap();
     assert_eq!(vectors.len(), report.chunks * 384);
