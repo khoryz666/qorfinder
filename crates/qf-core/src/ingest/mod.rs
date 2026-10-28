@@ -1,7 +1,9 @@
 //! Ingestion: find the files to index and extract their text.
 
+mod hash;
 mod walk;
 
+pub use hash::hash_file;
 pub use walk::{FoundFile, walk};
 
 use std::path::PathBuf;

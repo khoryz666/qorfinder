@@ -1,7 +1,7 @@
 use std::fs;
 
 use qf_core::Format;
-use qf_core::ingest::walk;
+use qf_core::ingest::{hash_file, walk};
 
 #[test]
 fn walk_finds_supported_files_recursively_in_path_order() {
@@ -35,4 +35,20 @@ fn walk_reports_missing_root_as_skipped() {
     let (found, skipped) = walk(std::path::Path::new("/nonexistent/qorfinder"));
     assert!(found.is_empty());
     assert_eq!(skipped.len(), 1);
+}
+
+#[test]
+fn hash_file_is_sha256_of_contents() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("a.txt");
+    fs::write(&path, "abc").unwrap();
+    let hex: String = hash_file(&path)
+        .unwrap()
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect();
+    assert_eq!(
+        hex,
+        "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+    );
 }
