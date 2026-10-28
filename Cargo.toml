@@ -1,0 +1,17 @@
+[workspace]
+resolver = "3"
+members = ["crates/qf-core", "crates/qf-cli"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+
+[workspace.dependencies]
+qf-core = { path = "crates/qf-core" }
+anyhow = "1"
+thiserror = "2"
+
+[profile.release]
+lto = "thin"
+strip = true
