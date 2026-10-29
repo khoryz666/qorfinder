@@ -18,7 +18,7 @@ pub struct FoundFile {
 
 /// Recursively list every `.pdf`, `.docx` and `.txt` file under `root`,
 /// sorted by path so document ids are the same run to run. Entries that
-/// cannot be read are returned as skipped; other file types are ignored.
+/// cannot be read, and files of any other type, are returned as skipped.
 pub fn walk(root: &Path) -> (Vec<FoundFile>, Vec<Skipped>) {
     let mut found = Vec::new();
     let mut skipped = Vec::new();
@@ -37,6 +37,10 @@ pub fn walk(root: &Path) -> (Vec<FoundFile>, Vec<Skipped>) {
             continue;
         }
         let Some(format) = Format::from_path(entry.path()) else {
+            skipped.push(Skipped {
+                path: entry.into_path(),
+                reason: "unsupported file type".into(),
+            });
             continue;
         };
         match entry.metadata() {

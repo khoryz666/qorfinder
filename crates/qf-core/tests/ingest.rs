@@ -10,10 +10,12 @@ fn walk_finds_supported_files_recursively_in_path_order() {
     fs::write(dir.path().join("b.txt"), "hello").unwrap();
     fs::write(dir.path().join("a.PDF"), "%PDF").unwrap();
     fs::write(dir.path().join("sub/c.docx"), "PK").unwrap();
-    fs::write(dir.path().join("notes.md"), "ignored").unwrap();
+    fs::write(dir.path().join("notes.md"), "not indexed").unwrap();
 
     let (found, skipped) = walk(dir.path());
-    assert!(skipped.is_empty());
+    assert_eq!(skipped.len(), 1);
+    assert!(skipped[0].path.ends_with("notes.md"));
+    assert_eq!(skipped[0].reason, "unsupported file type");
     let names: Vec<_> = found
         .iter()
         .map(|f| f.path.strip_prefix(dir.path()).unwrap().to_path_buf())
