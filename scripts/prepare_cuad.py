@@ -10,12 +10,18 @@ Usage: python3 scripts/prepare_cuad.py [-n 50] [-x 0.3] [--seed 2026]
 
 Try a few values of -n and -x until 15-20 categories qualify (report
 Section 4.1.3).
+
+All 510 contracts go to data/cuad/txt/ (for the timing run, T10); the
+sampled ones are also copied to data/cuad/sample/, the only folder the
+evaluation indexes. spans.tsv covers the sample alone, so indexing all 510
+would count their unjudged clauses as not relevant.
 """
 
 import argparse
 import json
 import random
 import re
+import shutil
 import sys
 from pathlib import Path
 
@@ -104,6 +110,17 @@ def sample_and_count(
     return sample, counts, kept
 
 
+def copy_sample(sample: list[dict], txt_dir: Path, sample_dir: Path) -> None:
+    """Copy the sampled contracts into sample_dir, removing any .txt left
+    there by an earlier run with a different sample."""
+    sample_dir.mkdir(parents=True, exist_ok=True)
+    for old in sample_dir.glob("*.txt"):
+        old.unlink()
+    for contract in sample:
+        shutil.copyfile(txt_dir / contract["file"], sample_dir / contract["file"])
+    print(f"copied {len(sample)} sampled contracts to {sample_dir}")
+
+
 def write_selection(
     out_dir: Path,
     sample: list[dict],
@@ -152,6 +169,7 @@ def main() -> int:
         "--cuad", type=Path, default=Path("data/cuad/CUAD_v1/CUAD_v1.json")
     )
     parser.add_argument("--txt-dir", type=Path, default=Path("data/cuad/txt"))
+    parser.add_argument("--sample-dir", type=Path, default=Path("data/cuad/sample"))
     parser.add_argument("--testset", type=Path, default=Path("data/testset"))
     parser.add_argument("-n", type=int, default=50, help="contracts to sample")
     parser.add_argument(
@@ -167,6 +185,7 @@ def main() -> int:
     write_texts(contracts, args.txt_dir)
     sample, counts, kept = sample_and_count(contracts, args.n, args.seed, args.x)
     print_counts(counts, kept, args.n, args.x)
+    copy_sample(sample, args.txt_dir, args.sample_dir)
     write_selection(args.testset, sample, counts, kept, descriptions)
     write_spans(args.testset, sample, kept)
     return 0

@@ -69,10 +69,12 @@ python3 scripts/prepare_cuad.py -n 15 -x 0.3
 ```
 
 This writes all 510 contracts to `data/cuad/txt/` with offsets matching the
-annotations, samples `-n` contracts with a fixed seed, prints how many
-contain each clause category, keeps the categories found in at most `-x` of
-them, and writes `docs.txt`, `categories.tsv` and `spans.tsv` to
-`data/testset/`.
+annotations, samples `-n` contracts with a fixed seed and copies them to
+`data/cuad/sample/`, prints how many contain each clause category, keeps the
+categories found in at most `-x` of them, and writes `docs.txt`,
+`categories.tsv` and `spans.tsv` to `data/testset/`. The evaluation indexes
+`data/cuad/sample/` only, since the spans cover the sample alone; the full
+`data/cuad/txt/` is for the timing run.
 
 ## Develop
 
