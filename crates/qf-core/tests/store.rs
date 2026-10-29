@@ -1,6 +1,8 @@
 use std::path::PathBuf;
 
-use qf_core::store::{Store, StoreError, VectorWriter, install, read_vectors, staging_dir};
+use qf_core::store::{
+    Store, StoreError, VectorWriter, install, is_replaceable, read_vectors, staging_dir,
+};
 use qf_core::{Chunk, Document, Format, IndexMeta};
 
 fn document(id: u32) -> Document {
@@ -174,13 +176,16 @@ fn install_swaps_in_the_new_index_and_removes_the_old() {
     let dir = root.path().join("index");
     let staging = staging_dir(&dir);
     std::fs::create_dir_all(&dir).unwrap();
-    std::fs::write(dir.join("which"), "old").unwrap();
+    std::fs::write(dir.join("index.sqlite"), "old").unwrap();
     std::fs::create_dir_all(&staging).unwrap();
-    std::fs::write(staging.join("which"), "new").unwrap();
+    std::fs::write(staging.join("index.sqlite"), "new").unwrap();
 
     assert!(install(&staging, &dir).unwrap().is_none());
 
-    assert_eq!(std::fs::read_to_string(dir.join("which")).unwrap(), "new");
+    assert_eq!(
+        std::fs::read_to_string(dir.join("index.sqlite")).unwrap(),
+        "new"
+    );
     let mut left: Vec<_> = std::fs::read_dir(root.path())
         .unwrap()
         .map(|e| e.unwrap().file_name())
@@ -195,11 +200,14 @@ fn install_works_when_there_is_no_old_index() {
     let dir = root.path().join("index");
     let staging = staging_dir(&dir);
     std::fs::create_dir_all(&staging).unwrap();
-    std::fs::write(staging.join("which"), "new").unwrap();
+    std::fs::write(staging.join("index.sqlite"), "new").unwrap();
 
     assert!(install(&staging, &dir).unwrap().is_none());
 
-    assert_eq!(std::fs::read_to_string(dir.join("which")).unwrap(), "new");
+    assert_eq!(
+        std::fs::read_to_string(dir.join("index.sqlite")).unwrap(),
+        "new"
+    );
     assert!(!staging.exists());
 }
 
@@ -220,30 +228,32 @@ fn unlock(folder: &std::path::Path) {
     std::fs::set_permissions(folder, std::fs::Permissions::from_mode(0o755)).unwrap();
 }
 
-/// A file in the old index that cannot be deleted leaves the old folder
-/// behind, but the new index is installed and the call succeeds.
+/// An old index whose files cannot be deleted is left behind, but the new
+/// index is installed and the call succeeds.
 #[cfg(unix)]
 #[test]
 fn install_succeeds_when_the_old_index_cannot_be_deleted() {
     let root = tempfile::tempdir().unwrap();
     let dir = root.path().join("index");
-    let locked = dir.join("locked");
-    std::fs::create_dir_all(&locked).unwrap();
-    std::fs::write(locked.join("file"), "old").unwrap();
-    if !lock(&locked) {
-        unlock(&locked);
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("index.sqlite"), "old").unwrap();
+    if !lock(&dir) {
+        unlock(&dir);
         return;
     }
     let staging = staging_dir(&dir);
     std::fs::create_dir_all(&staging).unwrap();
-    std::fs::write(staging.join("which"), "new").unwrap();
+    std::fs::write(staging.join("index.sqlite"), "new").unwrap();
 
     let warning = install(&staging, &dir).unwrap();
 
     let old = root.path().join("index.old");
-    unlock(&old.join("locked"));
+    unlock(&old);
     assert!(warning.is_some());
-    assert_eq!(std::fs::read_to_string(dir.join("which")).unwrap(), "new");
+    assert_eq!(
+        std::fs::read_to_string(dir.join("index.sqlite")).unwrap(),
+        "new"
+    );
     assert!(old.exists());
 }
 
@@ -254,9 +264,9 @@ fn install_succeeds_when_the_old_index_cannot_be_deleted() {
 fn install_works_around_a_locked_leftover_old_index() {
     let root = tempfile::tempdir().unwrap();
     let dir = root.path().join("index");
-    let locked = root.path().join("index.old/locked");
+    let locked = root.path().join("index.old");
     std::fs::create_dir_all(&locked).unwrap();
-    std::fs::write(locked.join("file"), "older").unwrap();
+    std::fs::write(locked.join("index.sqlite"), "older").unwrap();
     if !lock(&locked) {
         unlock(&locked);
         return;
@@ -264,14 +274,17 @@ fn install_works_around_a_locked_leftover_old_index() {
     let build = |which: &str| {
         let staging = staging_dir(&dir);
         std::fs::create_dir_all(&staging).unwrap();
-        std::fs::write(staging.join("which"), which).unwrap();
+        std::fs::write(staging.join("index.sqlite"), which).unwrap();
         install(&staging, &dir).unwrap()
     };
     std::fs::create_dir_all(&dir).unwrap();
-    std::fs::write(dir.join("which"), "old").unwrap();
+    std::fs::write(dir.join("index.sqlite"), "old").unwrap();
 
     assert!(build("new").is_none());
-    assert_eq!(std::fs::read_to_string(dir.join("which")).unwrap(), "new");
+    assert_eq!(
+        std::fs::read_to_string(dir.join("index.sqlite")).unwrap(),
+        "new"
+    );
 
     unlock(&locked);
     assert!(build("newer").is_none());
@@ -281,6 +294,45 @@ fn install_works_around_a_locked_leftover_old_index() {
         .collect();
     left.sort();
     assert_eq!(left, ["index"]);
+}
+
+#[test]
+fn only_missing_empty_or_index_folders_are_replaceable() {
+    let root = tempfile::tempdir().unwrap();
+    let dir = root.path().join("index");
+    assert!(is_replaceable(&dir).unwrap());
+    std::fs::create_dir(&dir).unwrap();
+    assert!(is_replaceable(&dir).unwrap());
+    std::fs::write(dir.join("index.sqlite"), "").unwrap();
+    std::fs::write(dir.join("vectors.f32"), "").unwrap();
+    assert!(is_replaceable(&dir).unwrap());
+    std::fs::create_dir(dir.join("sub")).unwrap();
+    assert!(!is_replaceable(&dir).unwrap());
+    std::fs::remove_dir(dir.join("sub")).unwrap();
+    std::fs::write(dir.join("contract.pdf"), "").unwrap();
+    assert!(!is_replaceable(&dir).unwrap());
+}
+
+/// Pointing the index at a folder of the user's own files must never move
+/// or delete them.
+#[test]
+fn install_refuses_to_replace_a_folder_of_other_files() {
+    let root = tempfile::tempdir().unwrap();
+    let dir = root.path().join("contracts");
+    std::fs::create_dir(&dir).unwrap();
+    std::fs::write(dir.join("lease.docx"), "mine").unwrap();
+    let staging = staging_dir(&dir);
+    std::fs::create_dir(&staging).unwrap();
+    std::fs::write(staging.join("index.sqlite"), "new").unwrap();
+
+    let err = install(&staging, &dir).unwrap_err();
+
+    assert!(matches!(err, StoreError::NotAnIndex(_)), "{err}");
+    assert_eq!(
+        std::fs::read_to_string(dir.join("lease.docx")).unwrap(),
+        "mine"
+    );
+    assert!(!root.path().join("contracts.old").exists());
 }
 
 #[test]

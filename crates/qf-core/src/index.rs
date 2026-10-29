@@ -10,7 +10,9 @@ use crate::chunk::{ChunkConfig, Tokenize};
 use crate::embed::{BATCH_SIZE, EmbedError, Embedder, MODEL_ID};
 use crate::ingest::{Skipped, hash_file, walk};
 use crate::prepare::prepare;
-use crate::store::{Store, StoreError, VECTORS_FILE, VectorWriter, install, staging_dir};
+use crate::store::{
+    Store, StoreError, VECTORS_FILE, VectorWriter, ensure_replaceable, install, staging_dir,
+};
 use crate::{Chunk, Document, IndexMeta};
 
 #[derive(Debug, thiserror::Error)]
@@ -138,6 +140,7 @@ pub fn build_index(
     let prepare_time = started.elapsed();
 
     let staging = staging_dir(index_dir);
+    ensure_replaceable(&staging)?;
     if staging.exists() {
         std::fs::remove_dir_all(&staging).map_err(StoreError::from)?;
     }

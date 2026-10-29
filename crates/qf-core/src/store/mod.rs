@@ -16,6 +16,9 @@ use crate::{Chunk, Document, Format, IndexMeta};
 pub const DB_FILE: &str = "index.sqlite";
 /// Embedding vectors inside the index folder.
 pub const VECTORS_FILE: &str = "vectors.f32";
+/// Everything QorFinder writes into an index folder; SQLite leaves the
+/// journal behind if a run is killed mid-transaction.
+const INDEX_FILES: [&str; 3] = [DB_FILE, VECTORS_FILE, "index.sqlite-journal"];
 
 #[derive(Debug, thiserror::Error)]
 pub enum StoreError {
@@ -23,6 +26,12 @@ pub enum StoreError {
     Sqlite(#[from] rusqlite::Error),
     #[error("index file: {0}")]
     Io(#[from] std::io::Error),
+    #[error(
+        "{} is not a QorFinder index (it holds other files), so it will not be \
+         replaced; choose an empty or new folder for the index",
+        .0.display()
+    )]
+    NotAnIndex(PathBuf),
     #[error("index is damaged: {0}")]
     Corrupt(String),
     #[error(
@@ -66,12 +75,46 @@ pub fn staging_dir(dir: &Path) -> PathBuf {
     sibling(dir, ".partial")
 }
 
+/// Whether `dir` may be replaced or deleted as an index: it does not exist,
+/// or it is a folder holding only files QorFinder writes there (an empty
+/// folder counts). Anything else may be the user's own files.
+pub fn is_replaceable(dir: &Path) -> std::io::Result<bool> {
+    let entries = match std::fs::read_dir(dir) {
+        Ok(entries) => entries,
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => return Ok(true),
+        Err(err) => return Err(err),
+    };
+    for entry in entries {
+        let entry = entry?;
+        let ours = entry.file_type()?.is_file()
+            && entry
+                .file_name()
+                .to_str()
+                .is_some_and(|name| INDEX_FILES.contains(&name));
+        if !ours {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
+/// Fail with [`StoreError::NotAnIndex`] unless `dir` is replaceable.
+pub fn ensure_replaceable(dir: &Path) -> Result<(), StoreError> {
+    if is_replaceable(dir)? {
+        Ok(())
+    } else {
+        Err(StoreError::NotAnIndex(dir.to_path_buf()))
+    }
+}
+
 /// Move a finished index from `staging` into `dir`, replacing the index
 /// that was there. The old index is moved aside first and deleted only
-/// once the new one is in place. Failing to delete it (say, a file locked
+/// once the new one is in place. A `dir` holding anything but an index is
+/// refused and left as it is. Failing to delete it (say, a file locked
 /// by antivirus) does not undo the install: the error is returned in `Ok`
 /// as a warning, and a later run removes the leftover folder.
 pub fn install(staging: &Path, dir: &Path) -> Result<Option<std::io::Error>, StoreError> {
+    ensure_replaceable(dir)?;
     remove_leftovers(dir);
     let old = unused_sibling(dir, ".old");
     if dir.exists() {
