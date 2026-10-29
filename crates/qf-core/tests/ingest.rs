@@ -202,6 +202,19 @@ fn corrupt_pdf_is_a_parse_error() {
     ));
 }
 
+/// A CUAD PDF (CC BY 4.0) with 40 bytes overwritten, on which pdf-extract
+/// panics. The panic must end as a parse error for that file alone.
+#[test]
+fn pdf_that_panics_the_parser_is_a_parse_error() {
+    let path =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/parser_panic.pdf");
+    let err = extract(&path, Format::Pdf).unwrap_err();
+    assert!(
+        matches!(&err, ParseError::Format(m) if m == "pdf parser panicked"),
+        "got {err:?}"
+    );
+}
+
 #[test]
 fn pdf_needing_a_password_is_reported_as_encrypted() {
     use lopdf::{Document, Object, dictionary};

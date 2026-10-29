@@ -1,4 +1,7 @@
+use std::cell::Cell;
+use std::panic::{self, AssertUnwindSafe};
 use std::path::Path;
+use std::sync::Once;
 
 use crate::Format;
 
@@ -45,6 +48,32 @@ impl Extracted {
     }
 }
 
+thread_local! {
+    /// Set while this thread runs a document parser.
+    static IN_PARSER: Cell<bool> = const { Cell::new(false) };
+}
+
+/// Run a document parser, turning a panic into `None`. Parsers panic on
+/// some malformed files (pdf-extract and its CMap parser did on 214 of 240
+/// corrupted CUAD PDFs); the file is then skipped with a reason, so the
+/// panic message would only print over the progress bars. The panic hook
+/// stays quiet for such panics and reports every other panic as before.
+fn catch_parser_panic<T>(parse: impl FnOnce() -> T) -> Option<T> {
+    static QUIET_HOOK: Once = Once::new();
+    QUIET_HOOK.call_once(|| {
+        let report = panic::take_hook();
+        panic::set_hook(Box::new(move |info| {
+            if !IN_PARSER.with(Cell::get) {
+                report(info);
+            }
+        }));
+    });
+    IN_PARSER.with(|flag| flag.set(true));
+    let result = panic::catch_unwind(AssertUnwindSafe(parse));
+    IN_PARSER.with(|flag| flag.set(false));
+    result.ok()
+}
+
 /// Extract the text of `path` with the extractor for `format`.
 pub fn extract(path: &Path, format: Format) -> Result<Extracted, ParseError> {
     let size = std::fs::metadata(path)?.len();
@@ -77,12 +106,12 @@ fn extract_txt(path: &Path) -> Result<Extracted, ParseError> {
 /// Pages are separated by a paragraph break. The text comes from
 /// pdf-extract, which decodes font encodings that lopdf's own
 /// `extract_text` cannot (lopdf alone got no text from any CUAD PDF).
-/// Both can panic on malformed files, so the whole parse runs under
-/// `catch_unwind` and a panic becomes an ordinary parse error.
+/// Both can panic on malformed files, so a panic becomes an ordinary
+/// parse error.
 fn extract_pdf(path: &Path) -> Result<Extracted, ParseError> {
     let bytes = std::fs::read(path)?;
-    std::panic::catch_unwind(|| extract_pdf_bytes(&bytes))
-        .unwrap_or_else(|_| Err(ParseError::Format("pdf parser panicked".into())))
+    catch_parser_panic(|| extract_pdf_bytes(&bytes))
+        .unwrap_or_else(|| Err(ParseError::Format("pdf parser panicked".into())))
 }
 
 fn extract_pdf_bytes(bytes: &[u8]) -> Result<Extracted, ParseError> {
@@ -125,8 +154,8 @@ fn extract_pdf_bytes(bytes: &[u8]) -> Result<Extracted, ParseError> {
 /// recorded.
 fn extract_docx(path: &Path) -> Result<Extracted, ParseError> {
     let bytes = std::fs::read(path)?;
-    let docx = std::panic::catch_unwind(|| docx_rs::read_docx(&bytes))
-        .map_err(|_| ParseError::Format("docx parser panicked".into()))?
+    let docx = catch_parser_panic(|| docx_rs::read_docx(&bytes))
+        .ok_or_else(|| ParseError::Format("docx parser panicked".into()))?
         .map_err(|e| ParseError::Format(e.to_string()))?;
     let mut paragraphs = Vec::new();
     for child in &docx.document.children {
