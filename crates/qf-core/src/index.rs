@@ -142,12 +142,21 @@ pub fn build_index(
     let embed_started = Instant::now();
     let mut vectors = VectorWriter::create(&staging.join(VECTORS_FILE), embedder.dim())?;
     progress.start(Stage::Embedding, chunks.len());
-    for batch in chunks.chunks(BATCH_SIZE) {
-        let texts: Vec<&str> = batch.iter().map(|c| c.text.as_str()).collect();
-        for vector in embedder.embed(&texts)? {
-            vectors.push(&vector)?;
+    // A batch is padded to its longest text, so batches of similar lengths
+    // waste less work: embed in order of length, then write every vector
+    // back at its chunk's row.
+    let mut by_length: Vec<usize> = (0..chunks.len()).collect();
+    by_length.sort_by_key(|&i| chunks[i].text.len());
+    let mut embedded: Vec<Vec<f32>> = vec![Vec::new(); chunks.len()];
+    for batch in by_length.chunks(BATCH_SIZE) {
+        let texts: Vec<&str> = batch.iter().map(|&i| chunks[i].text.as_str()).collect();
+        for (&i, vector) in batch.iter().zip(embedder.embed(&texts)?) {
+            embedded[i] = vector;
         }
         progress.advance(batch.len());
+    }
+    for vector in &embedded {
+        vectors.push(vector)?;
     }
     vectors.finish()?;
     progress.finish(Stage::Embedding);
