@@ -25,14 +25,11 @@ pub struct Cli {
     index_dir: Option<PathBuf>,
 
     /// Folder holding the embedding model files (config.json,
-    /// tokenizer.json, model.safetensors)
-    #[arg(
-        long,
-        global = true,
-        env = "QORFINDER_MODEL_DIR",
-        default_value = "models/all-MiniLM-L6-v2"
-    )]
-    model_dir: PathBuf,
+    /// tokenizer.json, model.safetensors). Defaults to
+    /// models/all-MiniLM-L6-v2 next to the executable, or in the current
+    /// folder when running from the repository
+    #[arg(long, global = true, env = "QORFINDER_MODEL_DIR")]
+    model_dir: Option<PathBuf>,
 
     #[command(subcommand)]
     command: Command,
@@ -94,6 +91,7 @@ impl ChunkArgs {
 
 pub fn run() -> Result<()> {
     let cli = Cli::parse();
+    let model_dir = cli.model_dir.unwrap_or_else(default_model_dir);
     match cli.command {
         Command::Index {
             folder,
@@ -102,16 +100,30 @@ pub fn run() -> Result<()> {
         } => {
             let config = chunking.config()?;
             if dry_run {
-                return dry_run_index(&folder, &cli.model_dir, config);
+                return dry_run_index(&folder, &model_dir, config);
             }
             let index_dir = cli.index_dir.unwrap_or_else(default_index_dir);
-            index(&folder, &index_dir, &cli.model_dir, config)
+            index(&folder, &index_dir, &model_dir, config)
         }
         Command::Search { query, k, chunking } => {
             let index_dir = cli.index_dir.unwrap_or_else(default_index_dir);
-            search(&query, k, &index_dir, &cli.model_dir, chunking.config()?)
+            search(&query, k, &index_dir, &model_dir, chunking.config()?)
         }
     }
+}
+
+/// Where the model sits relative to the executable in a release, and to
+/// the repository root in development.
+const MODEL_SUBDIR: &str = "models/all-MiniLM-L6-v2";
+
+/// The model shipped next to the executable, so a release works from any
+/// working folder; otherwise the repository copy, for `cargo run`.
+fn default_model_dir() -> PathBuf {
+    std::env::current_exe()
+        .ok()
+        .and_then(|exe| Some(exe.parent()?.join(MODEL_SUBDIR)))
+        .filter(|dir| dir.is_dir())
+        .unwrap_or_else(|| PathBuf::from(MODEL_SUBDIR))
 }
 
 fn default_index_dir() -> PathBuf {

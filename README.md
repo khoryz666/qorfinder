@@ -35,7 +35,8 @@ instead of embedding anything, which is useful for checking extraction.
 
 Global options: `--index-dir` (or `QORFINDER_INDEX_DIR`; default
 `qorfinder/index` in the user's local data folder) and `--model-dir` (or
-`QORFINDER_MODEL_DIR`; default `models/all-MiniLM-L6-v2`). `--max-tokens`
+`QORFINDER_MODEL_DIR`; default `models/all-MiniLM-L6-v2` next to the
+executable, or in the current folder). `--max-tokens`
 (200) and `--overlap` (40) set the chunk size; an index is only searched with
 the settings it was built with.
 
