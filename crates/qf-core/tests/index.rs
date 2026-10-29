@@ -173,25 +173,71 @@ fn saved_index_is_searched_after_reopening() {
 }
 
 #[test]
-fn index_folder_must_not_overlap_the_documents() {
+fn documents_may_not_be_inside_the_index_folder() {
     use qf_core::index::{IndexError, check_index_dir};
 
     let root = tempfile::tempdir().unwrap();
     let docs = root.path().join("contracts");
     fs::create_dir(&docs).unwrap();
-    let overlap = |index: PathBuf| {
+    let refused = |index: PathBuf| {
         matches!(
             check_index_dir(&docs, &index),
-            Err(IndexError::Overlap { .. })
+            Err(IndexError::FolderInsideIndex { .. })
         )
     };
-    assert!(overlap(docs.clone()));
-    assert!(overlap(docs.join("index")));
-    assert!(overlap(docs.join("sub/../index")));
-    assert!(overlap(root.path().to_path_buf()));
+    assert!(refused(docs.clone()));
+    assert!(refused(docs.join(".")));
+    assert!(refused(root.path().to_path_buf()));
     assert!(check_index_dir(&docs, &root.path().join("index")).is_ok());
-    // A sibling whose name merely starts the same is not inside.
+    // A sibling whose name merely starts the same is not a parent.
     assert!(check_index_dir(&docs, &root.path().join("contracts-index")).is_ok());
+    // The index may sit inside the documents, as the default one does when
+    // a whole user folder is indexed.
+    assert!(check_index_dir(&docs, &docs.join("index")).is_ok());
+    assert!(check_index_dir(&docs, &docs.join("sub/../index")).is_ok());
+}
+
+/// With the index inside the indexed folder, rebuilding twice indexes the
+/// documents only: the index, its staging folder and old copies are left
+/// out of the walk, not read as documents or listed as skipped.
+#[test]
+#[ignore = "needs models/ from scripts/fetch_model.py"]
+fn index_inside_the_indexed_folder_is_left_out() {
+    let docs = tempfile::tempdir().unwrap();
+    fs::write(
+        docs.path().join("lease.txt"),
+        "The tenant pays rent monthly.",
+    )
+    .unwrap();
+    let index_dir = docs.path().join(".qorfinder/index");
+    let embedder = Embedder::load(&model_dir()).unwrap();
+    let tokenizer = ModelTokenizer::from_file(&model_dir().join("tokenizer.json")).unwrap();
+
+    for _ in 0..2 {
+        let report = build_index(
+            docs.path(),
+            &index_dir,
+            &embedder,
+            &tokenizer,
+            ChunkConfig::default(),
+            &(),
+        )
+        .unwrap();
+        assert_eq!(report.documents, 1);
+        assert!(report.skipped.is_empty(), "{:?}", report.skipped);
+    }
+    // A user's text file beside the index is still a document.
+    fs::write(docs.path().join(".qorfinder/notes.txt"), "Rent is due.").unwrap();
+    let report = build_index(
+        docs.path(),
+        &index_dir,
+        &embedder,
+        &tokenizer,
+        ChunkConfig::default(),
+        &(),
+    )
+    .unwrap();
+    assert_eq!(report.documents, 2);
 }
 
 #[test]

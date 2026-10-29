@@ -33,7 +33,7 @@ fn index_dir_holding_other_files_is_refused_and_kept() {
         assert!(!out.status.success());
         let stderr = String::from_utf8_lossy(&out.stderr);
         assert!(
-            stderr.contains("not a QorFinder index") || stderr.contains("overlap"),
+            stderr.contains("not a QorFinder index") || stderr.contains("inside it"),
             "{stderr}"
         );
     }

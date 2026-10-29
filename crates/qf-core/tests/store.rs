@@ -1,7 +1,8 @@
 use std::path::PathBuf;
 
 use qf_core::store::{
-    Store, StoreError, VectorWriter, install, is_replaceable, read_vectors, staging_dir,
+    Store, StoreError, VectorWriter, install, is_index_folder_name, is_replaceable, read_vectors,
+    staging_dir,
 };
 use qf_core::{Chunk, Document, Format, IndexMeta};
 
@@ -356,6 +357,25 @@ fn install_keeps_a_user_folder_named_like_a_leftover() {
         std::fs::read_to_string(dir.join("index.sqlite")).unwrap(),
         "new"
     );
+}
+
+#[test]
+fn index_folder_names_cover_staging_and_old_copies() {
+    use std::ffi::OsStr;
+
+    let named = |name: &str| is_index_folder_name(OsStr::new("index"), OsStr::new(name));
+    for name in ["index", "index.partial", "index.old", "index.old-3"] {
+        assert!(named(name), "{name}");
+    }
+    for name in [
+        "indexes",
+        "index.old-",
+        "index.older",
+        "index.partial2",
+        "my-index",
+    ] {
+        assert!(!named(name), "{name}");
+    }
 }
 
 #[test]

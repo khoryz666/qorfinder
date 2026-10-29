@@ -8,10 +8,11 @@ use rayon::prelude::*;
 
 use crate::chunk::{ChunkConfig, Tokenize};
 use crate::embed::{BATCH_SIZE, EmbedError, Embedder, MODEL_ID};
-use crate::ingest::{Skipped, hash_file, walk};
+use crate::ingest::{Skipped, hash_file, walk_except};
 use crate::prepare::prepare;
 use crate::store::{
-    Store, StoreError, VECTORS_FILE, VectorWriter, ensure_replaceable, install, staging_dir,
+    Store, StoreError, VECTORS_FILE, VectorWriter, ensure_replaceable, install,
+    is_index_folder_name, staging_dir,
 };
 use crate::{Chunk, Document, IndexMeta};
 
@@ -22,12 +23,12 @@ pub enum IndexError {
     #[error("embedding failed: {0}")]
     Embed(#[from] EmbedError),
     #[error(
-        "the index folder {} and the indexed folder {} overlap; keep the index \
-         outside the documents",
-        index.display(),
-        folder.display()
+        "the indexed folder {} is the index folder {} or inside it; choose \
+         another folder for the index",
+        folder.display(),
+        index.display()
     )]
-    Overlap { index: PathBuf, folder: PathBuf },
+    FolderInsideIndex { index: PathBuf, folder: PathBuf },
 }
 
 /// What an indexing run did and how long each part took.
@@ -78,14 +79,16 @@ pub fn index_meta(embedder: &Embedder, config: ChunkConfig) -> IndexMeta {
 }
 
 /// Check that indexing `folder` into `index_dir` cannot touch the user's
-/// files: neither folder may contain the other (or be the same), and the
-/// index folder and its staging folder must be missing, empty or an
-/// index. Run before any work, so a mistyped path fails at once.
+/// files: the documents may not be in the index folder (or be it), and the
+/// index folder and its staging folder must be missing, empty or an index.
+/// The index may sit inside the documents, as the default one does when a
+/// whole user folder is indexed; [`build_index`] then leaves it out of the
+/// walk. Run before any work, so a mistyped path fails at once.
 pub fn check_index_dir(folder: &Path, index_dir: &Path) -> Result<(), IndexError> {
     let index = resolve(index_dir).map_err(StoreError::from)?;
     let source = resolve(folder).map_err(StoreError::from)?;
-    if index.starts_with(&source) || source.starts_with(&index) {
-        return Err(IndexError::Overlap {
+    if source.starts_with(&index) {
+        return Err(IndexError::FolderInsideIndex {
             index: index_dir.to_path_buf(),
             folder: folder.to_path_buf(),
         });
@@ -93,6 +96,23 @@ pub fn check_index_dir(folder: &Path, index_dir: &Path) -> Result<(), IndexError
     ensure_replaceable(index_dir)?;
     ensure_replaceable(&staging_dir(index_dir))?;
     Ok(())
+}
+
+/// Whether `path` is `index_dir` or a folder an install makes beside it
+/// (`.partial`, `.old`, `.old-N`), for leaving them out of the walk when
+/// the index sits inside the indexed folder.
+fn index_folders(index_dir: &Path) -> impl Fn(&Path) -> bool {
+    let index = resolve(index_dir).ok();
+    move |path| {
+        let Some(index) = &index else {
+            return false;
+        };
+        let (Some(name), Some(index_name)) = (path.file_name(), index.file_name()) else {
+            return false;
+        };
+        is_index_folder_name(index_name, name)
+            && path.parent().and_then(|p| resolve(p).ok()).as_deref() == index.parent()
+    }
 }
 
 /// `path` made absolute with symbolic links and `..` resolved, also when it
@@ -144,7 +164,7 @@ pub fn build_index(
 ) -> Result<IndexReport, IndexError> {
     check_index_dir(folder, index_dir)?;
     let started = Instant::now();
-    let (files, mut skipped) = walk(folder);
+    let (files, mut skipped) = walk_except(folder, index_folders(index_dir));
     progress.start(Stage::Preparing, files.len());
     let prepared: Vec<_> = files
         .into_par_iter()

@@ -3,7 +3,7 @@
 
 mod vectors;
 
-use std::ffi::OsString;
+use std::ffi::{OsStr, OsString};
 use std::path::{Path, PathBuf};
 
 pub use vectors::{VectorWriter, read_vectors};
@@ -158,6 +158,21 @@ fn remove_leftovers(dir: &Path) {
             let _ = std::fs::remove_dir_all(entry.path());
         }
     }
+}
+
+/// Whether a folder named `name` is the index `dir` names or one of the
+/// folders an install makes beside it: `.partial`, `.old` and `.old-N`.
+pub fn is_index_folder_name(dir_name: &OsStr, name: &OsStr) -> bool {
+    let (Some(dir_name), Some(name)) = (dir_name.to_str(), name.to_str()) else {
+        return dir_name == name;
+    };
+    name.strip_prefix(dir_name).is_some_and(|rest| {
+        rest.is_empty()
+            || rest == ".partial"
+            || rest
+                .strip_prefix(".old")
+                .is_some_and(|n| n.is_empty() || is_counter_suffix(n))
+    })
 }
 
 /// `-1`, `-2`, ...: the suffix `unused_sibling` adds.
