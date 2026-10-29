@@ -247,6 +247,42 @@ fn install_succeeds_when_the_old_index_cannot_be_deleted() {
     assert!(old.exists());
 }
 
+/// An old index a previous run could not delete, still locked, does not
+/// block the next rebuild; it is removed once it can be.
+#[cfg(unix)]
+#[test]
+fn install_works_around_a_locked_leftover_old_index() {
+    let root = tempfile::tempdir().unwrap();
+    let dir = root.path().join("index");
+    let locked = root.path().join("index.old/locked");
+    std::fs::create_dir_all(&locked).unwrap();
+    std::fs::write(locked.join("file"), "older").unwrap();
+    if !lock(&locked) {
+        unlock(&locked);
+        return;
+    }
+    let build = |which: &str| {
+        let staging = staging_dir(&dir);
+        std::fs::create_dir_all(&staging).unwrap();
+        std::fs::write(staging.join("which"), which).unwrap();
+        install(&staging, &dir).unwrap()
+    };
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("which"), "old").unwrap();
+
+    assert!(build("new").is_none());
+    assert_eq!(std::fs::read_to_string(dir.join("which")).unwrap(), "new");
+
+    unlock(&locked);
+    assert!(build("newer").is_none());
+    let mut left: Vec<_> = std::fs::read_dir(root.path())
+        .unwrap()
+        .map(|e| e.unwrap().file_name())
+        .collect();
+    left.sort();
+    assert_eq!(left, ["index"]);
+}
+
 #[test]
 fn source_folder_round_trips() {
     let dir = tempfile::tempdir().unwrap();

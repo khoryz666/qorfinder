@@ -70,12 +70,10 @@ pub fn staging_dir(dir: &Path) -> PathBuf {
 /// that was there. The old index is moved aside first and deleted only
 /// once the new one is in place. Failing to delete it (say, a file locked
 /// by antivirus) does not undo the install: the error is returned in `Ok`
-/// as a warning, and the next run removes the leftover folder.
+/// as a warning, and a later run removes the leftover folder.
 pub fn install(staging: &Path, dir: &Path) -> Result<Option<std::io::Error>, StoreError> {
-    let old = sibling(dir, ".old");
-    if old.exists() {
-        std::fs::remove_dir_all(&old)?;
-    }
+    remove_leftovers(dir);
+    let old = unused_sibling(dir, ".old");
     if dir.exists() {
         std::fs::rename(dir, &old)?;
     }
@@ -89,6 +87,49 @@ pub fn install(staging: &Path, dir: &Path) -> Result<Option<std::io::Error>, Sto
         return Ok(std::fs::remove_dir_all(&old).err());
     }
     Ok(None)
+}
+
+/// Delete old indexes that earlier runs could not. Best effort: a leftover
+/// still locked must not stop this run, which moves its own old index to
+/// an unused name instead.
+fn remove_leftovers(dir: &Path) {
+    let Some(name) = dir.file_name().and_then(|n| n.to_str()) else {
+        return;
+    };
+    let prefix = format!("{name}.old");
+    let parent = dir
+        .parent()
+        .filter(|p| !p.as_os_str().is_empty())
+        .unwrap_or(Path::new("."));
+    let Ok(entries) = std::fs::read_dir(parent) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let leftover = entry.file_name().to_str().is_some_and(|n| {
+            n.strip_prefix(&prefix)
+                .is_some_and(|rest| rest.is_empty() || is_counter_suffix(rest))
+        });
+        if leftover {
+            let _ = std::fs::remove_dir_all(entry.path());
+        }
+    }
+}
+
+/// `-1`, `-2`, ...: the suffix `unused_sibling` adds.
+fn is_counter_suffix(s: &str) -> bool {
+    s.strip_prefix('-')
+        .is_some_and(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit()))
+}
+
+/// `dir` plus `suffix`, or plus `suffix-1`, `suffix-2`, ... if that exists.
+fn unused_sibling(dir: &Path, suffix: &str) -> PathBuf {
+    let mut path = sibling(dir, suffix);
+    let mut n = 1;
+    while path.exists() {
+        path = sibling(dir, &format!("{suffix}-{n}"));
+        n += 1;
+    }
+    path
 }
 
 /// `dir` with `suffix` appended to its last component.
