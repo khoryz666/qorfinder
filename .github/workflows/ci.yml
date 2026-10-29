@@ -27,13 +27,24 @@ jobs:
       - name: Check formatting
         run: nix develop --ignore-environment --keep HOME --command cargo fmt --all -- --check
 
+      # The model is pinned by revision and SHA-256 in fetch_model.py, so the
+      # cache key changes exactly when the model does.
+      - name: Cache the model
+        uses: actions/cache@v4
+        with:
+          path: models
+          key: model-${{ hashFiles('scripts/fetch_model.py') }}
+
       - name: Lint
         run: nix develop --ignore-environment --keep HOME --command cargo clippy --workspace --all-targets -- -D warnings
 
-      # Tests that need the model files under models/ are #[ignore]d, so
-      # this stays offline and fast.
+      - name: Fetch the model
+        run: nix develop --ignore-environment --keep HOME --command python3 scripts/fetch_model.py
+
+      # --include-ignored also runs the tests that load the model, among them
+      # the check against sentence-transformers quoted in the report.
       - name: Test
-        run: nix develop --ignore-environment --keep HOME --command cargo test --workspace
+        run: nix develop --ignore-environment --keep HOME --command cargo test --workspace -- --include-ignored
 
       - name: Check the scoring tools
         run: nix develop --ignore-environment --keep HOME --command python3 -c "import ranx, scipy"
@@ -48,8 +59,19 @@ jobs:
       - name: Cache cargo artifacts
         uses: Swatinem/rust-cache@v2
 
+      # The model is pinned by revision and SHA-256 in fetch_model.py, so the
+      # cache key changes exactly when the model does.
+      - name: Cache the model
+        uses: actions/cache@v4
+        with:
+          path: models
+          key: model-${{ hashFiles('scripts/fetch_model.py') }}
+
       - name: Build (release)
         run: cargo build --release
 
+      - name: Fetch the model
+        run: python scripts/fetch_model.py
+
       - name: Test
-        run: cargo test --workspace
+        run: cargo test --workspace -- --include-ignored
