@@ -58,7 +58,7 @@ impl Progress for () {}
 pub fn index_meta(embedder: &Embedder, config: ChunkConfig) -> IndexMeta {
     IndexMeta {
         model_id: MODEL_ID.to_string(),
-        model_rev: embedder.revision().to_string(),
+        weights_sha256: embedder.weights_sha256().to_string(),
         dim: embedder.dim(),
         max_tokens: config.max_tokens,
         overlap: config.overlap,

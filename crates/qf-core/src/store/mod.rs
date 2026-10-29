@@ -138,7 +138,7 @@ impl Store {
     pub fn write_meta(&self, meta: &IndexMeta) -> Result<(), StoreError> {
         let rows = [
             ("model_id", meta.model_id.clone()),
-            ("model_rev", meta.model_rev.clone()),
+            ("weights_sha256", meta.weights_sha256.clone()),
             ("dim", meta.dim.to_string()),
             ("max_tokens", meta.max_tokens.to_string()),
             ("overlap", meta.overlap.to_string()),
@@ -166,7 +166,7 @@ impl Store {
         };
         Ok(IndexMeta {
             model_id: get("model_id")?,
-            model_rev: get("model_rev")?,
+            weights_sha256: get("weights_sha256")?,
             dim: number("dim")?,
             max_tokens: number("max_tokens")?,
             overlap: number("overlap")?,
@@ -178,7 +178,11 @@ impl Store {
         let built = self.read_meta()?;
         let fields = [
             ("model", &built.model_id, &current.model_id),
-            ("model revision", &built.model_rev, &current.model_rev),
+            (
+                "model weights (SHA-256)",
+                &built.weights_sha256,
+                &current.weights_sha256,
+            ),
         ];
         for (field, b, c) in fields {
             if b != c {

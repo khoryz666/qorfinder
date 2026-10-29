@@ -13,7 +13,7 @@ fn loads_minilm() {
     assert_eq!(embedder.dim(), 384);
     // The weights pinned in scripts/fetch_model.py.
     assert_eq!(
-        embedder.revision(),
+        embedder.weights_sha256(),
         "53aa51172d142c89d9012cce15ae4d6cc0ca6895895114379cacb4fab128d9db"
     );
 }

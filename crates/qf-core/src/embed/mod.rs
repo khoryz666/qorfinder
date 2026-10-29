@@ -42,7 +42,7 @@ pub struct Embedder {
     tokenizer: Tokenizer,
     device: Device,
     dim: usize,
-    revision: String,
+    weights_sha256: String,
 }
 
 impl Embedder {
@@ -81,7 +81,7 @@ impl Embedder {
         // modified while the model is loaded, which nothing in QorFinder does.
         let vb = unsafe { VarBuilder::from_mmaped_safetensors(&[&weights], DTYPE, &device)? };
         let model = BertModel::load(vb, &config)?;
-        let revision = crate::ingest::hash_file(&weights)
+        let weights_sha256 = crate::ingest::hash_file(&weights)
             .map_err(|source| EmbedError::Io {
                 path: weights.display().to_string(),
                 source,
@@ -94,7 +94,7 @@ impl Embedder {
             tokenizer,
             device,
             dim: config.hidden_size,
-            revision,
+            weights_sha256,
         })
     }
 
@@ -105,8 +105,8 @@ impl Embedder {
 
     /// SHA-256 of `model.safetensors` in hex: identifies the exact weights
     /// an index was built with.
-    pub fn revision(&self) -> &str {
-        &self.revision
+    pub fn weights_sha256(&self) -> &str {
+        &self.weights_sha256
     }
 
     /// Embed one batch of texts (up to [`BATCH_SIZE`] at a time is best).

@@ -75,7 +75,7 @@ pub struct IndexMeta {
     pub model_id: String,
     /// SHA-256 of the model weights, so a changed weights file is caught
     /// even under the same model id.
-    pub model_rev: String,
+    pub weights_sha256: String,
     pub dim: usize,
     pub max_tokens: usize,
     pub overlap: usize,

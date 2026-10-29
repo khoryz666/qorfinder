@@ -96,7 +96,7 @@ fn truncated_vector_file_is_rejected() {
 fn meta() -> IndexMeta {
     IndexMeta {
         model_id: "sentence-transformers/all-MiniLM-L6-v2".into(),
-        model_rev: "53aa5117".into(),
+        weights_sha256: "53aa5117".into(),
         dim: 384,
         max_tokens: 200,
         overlap: 40,
