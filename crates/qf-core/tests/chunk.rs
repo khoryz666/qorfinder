@@ -73,6 +73,8 @@ fn recognises_clause_numbers() {
         "Article IV: Payment",
         "ARTICLE 5",
         "Section 7 (Fees)",
+        "V. TERMINATION",
+        "v. GENERAL PROVISIONS",
     ] {
         assert!(is_clause_start(line), "{line}");
     }
@@ -93,6 +95,8 @@ fn recognises_clause_numbers() {
         "e.g. this",
         "v. Jones",
         "V. Jones",
+        "v. Jones Ltd",
+        "V. A",
     ] {
         assert!(!is_clause_start(line), "{line}");
     }

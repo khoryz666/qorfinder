@@ -35,9 +35,9 @@ fn trim_end(text: &str, end: usize) -> usize {
 }
 
 /// Whether a line opens a numbered clause: `12.`, `12.3`, `12.3.1`, `4)`,
-/// `(a)`, `(iv)`, `(2)`, `a.` or `iv.` (but not `v.`) followed by whitespace, or a
-/// `Section 5`/`ARTICLE V` heading (any case, number or roman numeral)
-/// not followed by a lowercase word.
+/// `(a)`, `(iv)`, `(2)`, `a.` or `iv.` followed by whitespace (`v.` only
+/// before a word in capitals), or a `Section 5`/`ARTICLE V` heading (any
+/// case, number or roman numeral) not followed by a lowercase word.
 pub fn is_clause_start(line: &str) -> bool {
     let mut words = line.split_whitespace();
     let Some(first) = words.next() else {
@@ -51,17 +51,18 @@ pub fn is_clause_start(line: &str) -> bool {
                 .next()
                 .is_none_or(|title| !title.starts_with(|c: char| c.is_lowercase()));
     }
-    let Some((label, _rest)) = line.split_once(char::is_whitespace) else {
+    let Some((label, rest)) = line.split_once(char::is_whitespace) else {
         return false;
     };
     if let Some(inner) = label.strip_prefix('(').and_then(|l| l.strip_suffix(')')) {
         return (1..=4).contains(&inner.len()) && inner.chars().all(|c| c.is_ascii_alphanumeric());
     }
-    // "v." is left out: at the start of a wrapped line it is far more often
-    // "versus" in a case citation ("v. Jones") than a clause label.
+    // "v." counts only before a heading in capitals ("V. TERMINATION"): at
+    // the start of a wrapped line it is far more often "versus" in a case
+    // citation ("v. Jones") than a clause label.
     if let Some(letters) = label.strip_suffix('.')
         && (is_single_letter(letters) || is_roman(letters))
-        && !letters.eq_ignore_ascii_case("v")
+        && (!letters.eq_ignore_ascii_case("v") || starts_with_capitals_word(rest))
     {
         return true;
     }
@@ -83,6 +84,13 @@ fn is_decimal(s: &str) -> bool {
 fn is_heading_number(word: &str) -> bool {
     let word = word.trim_end_matches(['.', ':']);
     is_decimal(word) || is_roman(word)
+}
+
+/// Whether the first word of `s` has two or more letters, all capitals.
+fn starts_with_capitals_word(s: &str) -> bool {
+    let word = s.split_whitespace().next().unwrap_or("");
+    let letters = word.chars().filter(|c| c.is_alphabetic());
+    letters.clone().count() >= 2 && letters.into_iter().all(char::is_uppercase)
 }
 
 fn is_single_letter(s: &str) -> bool {
