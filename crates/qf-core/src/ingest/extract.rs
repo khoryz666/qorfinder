@@ -160,8 +160,9 @@ fn extract_docx(path: &Path) -> Result<Extracted, ParseError> {
     let mut paragraphs = Vec::new();
     for child in &docx.document.children {
         match child {
-            docx_rs::DocumentChild::Paragraph(p) => paragraphs.push(p.raw_text()),
+            docx_rs::DocumentChild::Paragraph(p) => paragraphs.push(paragraph_text(p)),
             docx_rs::DocumentChild::Table(t) => table_paragraphs(t, &mut paragraphs),
+            docx_rs::DocumentChild::StructuredDataTag(t) => tag_paragraphs(t, &mut paragraphs),
             _ => {}
         }
     }
@@ -179,11 +180,94 @@ fn table_paragraphs(table: &docx_rs::Table, out: &mut Vec<String>) {
         for TableRowChild::TableCell(cell) in &row.cells {
             for content in &cell.children {
                 match content {
-                    TableCellContent::Paragraph(p) => out.push(p.raw_text()),
+                    TableCellContent::Paragraph(p) => out.push(paragraph_text(p)),
                     TableCellContent::Table(t) => table_paragraphs(t, out),
+                    TableCellContent::StructuredDataTag(t) => tag_paragraphs(t, out),
+                    TableCellContent::TableOfContents(_) => {}
+                }
+            }
+        }
+    }
+}
+
+/// Paragraphs inside a block-level content control (`w:sdt`), which legal
+/// templates use for fields such as party names and dates. Loose runs in
+/// the control form one paragraph of their own.
+fn tag_paragraphs(tag: &docx_rs::StructuredDataTag, out: &mut Vec<String>) {
+    use docx_rs::StructuredDataTagChild;
+
+    let mut loose = String::new();
+    for child in &tag.children {
+        match child {
+            StructuredDataTagChild::Run(r) => run_text(r, &mut loose),
+            StructuredDataTagChild::Paragraph(p) => out.push(paragraph_text(p)),
+            StructuredDataTagChild::Table(t) => table_paragraphs(t, out),
+            StructuredDataTagChild::StructuredDataTag(t) => tag_paragraphs(t, out),
+            _ => {}
+        }
+    }
+    if !loose.is_empty() {
+        out.push(loose);
+    }
+}
+
+/// The text of a paragraph as Word shows it. Unlike docx-rs's `raw_text`,
+/// this keeps hyperlink text; tracked insertions and moves count, and text
+/// a tracked change deleted (or moved away) does not.
+fn paragraph_text(p: &docx_rs::Paragraph) -> String {
+    let mut text = String::new();
+    for child in &p.children {
+        child_text(child, &mut text);
+    }
+    text
+}
+
+fn child_text(child: &docx_rs::ParagraphChild, text: &mut String) {
+    use docx_rs::{InsertChild, MoveToChild, ParagraphChild, StructuredDataTagChild};
+
+    match child {
+        ParagraphChild::Run(r) => run_text(r, text),
+        ParagraphChild::Insert(i) => {
+            for c in &i.children {
+                if let InsertChild::Run(r) = c {
+                    run_text(r, text);
+                }
+            }
+        }
+        ParagraphChild::MoveTo(m) => {
+            for c in &m.children {
+                if let MoveToChild::Run(r) = c {
+                    run_text(r, text);
+                }
+            }
+        }
+        ParagraphChild::Hyperlink(h) => {
+            for c in &h.children {
+                child_text(c, text);
+            }
+        }
+        ParagraphChild::StructuredDataTag(t) => {
+            for c in &t.children {
+                match c {
+                    StructuredDataTagChild::Run(r) => run_text(r, text),
+                    StructuredDataTagChild::Paragraph(p) => text.push_str(&paragraph_text(p)),
                     _ => {}
                 }
             }
+        }
+        _ => {}
+    }
+}
+
+fn run_text(run: &docx_rs::Run, text: &mut String) {
+    use docx_rs::RunChild;
+
+    for c in &run.children {
+        match c {
+            RunChild::Text(t) => text.push_str(&t.text),
+            RunChild::Tab(_) | RunChild::PTab(_) => text.push('\t'),
+            RunChild::Break(_) | RunChild::CarriageReturn(_) => text.push('\n'),
+            _ => {}
         }
     }
 }

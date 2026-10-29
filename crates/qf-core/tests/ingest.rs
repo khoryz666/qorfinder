@@ -286,6 +286,62 @@ fn extracts_docx_paragraphs_and_tables() {
     assert!(out.pages.is_empty());
 }
 
+/// The text a reader sees in Word: hyperlinks, content controls (inline,
+/// as blocks and in table cells) and tracked insertions count; text a
+/// tracked change deleted does not.
+#[test]
+fn docx_reads_links_content_controls_and_tracked_changes() {
+    use docx_rs::{
+        Delete, Docx, Hyperlink, HyperlinkType, Insert, Paragraph, Run, StructuredDataTag, Table,
+        TableCell, TableRow,
+    };
+
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("template.docx");
+    let run = |text: &str| Run::new().add_text(text);
+    let link = Hyperlink::new("https://example.com", HyperlinkType::External)
+        .add_run(run("legal@example.com"));
+    Docx::new()
+        .add_paragraph(
+            Paragraph::new()
+                .add_run(run("Notices go to "))
+                .add_hyperlink(link)
+                .add_run(run(".")),
+        )
+        .add_paragraph(
+            Paragraph::new()
+                .add_run(run("The Supplier is "))
+                .add_structured_data_tag(StructuredDataTag::new().add_run(run("Acme Sdn Bhd")))
+                .add_run(run(".")),
+        )
+        .add_structured_data_tag(
+            StructuredDataTag::new()
+                .add_paragraph(Paragraph::new().add_run(run("Governed by Malaysian law."))),
+        )
+        .add_paragraph(
+            Paragraph::new()
+                .add_run(run("Payment within "))
+                .add_delete(Delete::new().add_run(Run::new().add_delete_text("30")))
+                .add_insert(Insert::new(run("14")))
+                .add_run(run(" days.")),
+        )
+        .add_table(Table::new(vec![TableRow::new(vec![
+            TableCell::new().add_structured_data_tag(
+                StructuredDataTag::new().add_paragraph(Paragraph::new().add_run(run("USD 500"))),
+            ),
+        ])]))
+        .build()
+        .pack(fs::File::create(&path).unwrap())
+        .unwrap();
+
+    let out = extract(&path, Format::Docx).unwrap();
+    assert_eq!(
+        out.text,
+        "Notices go to legal@example.com.\n\nThe Supplier is Acme Sdn Bhd.\n\n\
+         Governed by Malaysian law.\n\nPayment within 14 days.\n\nUSD 500"
+    );
+}
+
 #[test]
 fn corrupt_docx_is_a_parse_error() {
     let dir = tempfile::tempdir().unwrap();
