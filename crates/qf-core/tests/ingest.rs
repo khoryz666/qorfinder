@@ -32,6 +32,27 @@ fn walk_finds_supported_files_recursively_in_path_order() {
     assert!(found[1].mtime > 0);
 }
 
+#[cfg(unix)]
+#[test]
+fn walk_lists_symbolic_links_as_skipped() {
+    let dir = tempfile::tempdir().unwrap();
+    fs::write(dir.path().join("a.txt"), "hello").unwrap();
+    std::os::unix::fs::symlink(dir.path().join("a.txt"), dir.path().join("link.txt")).unwrap();
+
+    let (found, skipped) = walk(dir.path());
+    assert_eq!(found.len(), 1);
+    assert_eq!(skipped.len(), 1);
+    assert!(skipped[0].path.ends_with("link.txt"));
+    assert_eq!(skipped[0].reason, "symbolic link, not followed");
+
+    // A linked folder given as the root is still walked.
+    let outer = tempfile::tempdir().unwrap();
+    let root_link = outer.path().join("docs");
+    std::os::unix::fs::symlink(dir.path(), &root_link).unwrap();
+    let (found, _) = walk(&root_link);
+    assert_eq!(found.len(), 1);
+}
+
 #[test]
 fn walk_reports_missing_root_as_skipped() {
     let (found, skipped) = walk(std::path::Path::new("/nonexistent/qorfinder"));
