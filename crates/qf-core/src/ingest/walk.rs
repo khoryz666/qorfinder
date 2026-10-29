@@ -22,9 +22,24 @@ pub struct FoundFile {
 /// as skipped. Links are not followed: they can point outside the folder
 /// or at a file that is indexed already.
 pub fn walk(root: &Path) -> (Vec<FoundFile>, Vec<Skipped>) {
+    walk_except(root, |_| false)
+}
+
+/// [`walk`], without descending into the folders below `root` for which
+/// `leave_out` is true, such as QorFinder's own index. They are not listed
+/// as skipped either: they hold no documents of the user's.
+pub fn walk_except(
+    root: &Path,
+    leave_out: impl Fn(&Path) -> bool,
+) -> (Vec<FoundFile>, Vec<Skipped>) {
     let mut found = Vec::new();
     let mut skipped = Vec::new();
-    for entry in WalkDir::new(root).follow_links(false).sort_by_file_name() {
+    let entries = WalkDir::new(root)
+        .follow_links(false)
+        .sort_by_file_name()
+        .into_iter()
+        .filter_entry(|e| e.depth() == 0 || !e.file_type().is_dir() || !leave_out(e.path()));
+    for entry in entries {
         let entry = match entry {
             Ok(entry) => entry,
             Err(err) => {

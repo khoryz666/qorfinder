@@ -1,7 +1,9 @@
 use std::fs;
 
 use qf_core::Format;
-use qf_core::ingest::{Extracted, MAX_FILE_SIZE_BYTES, ParseError, extract, hash_file, walk};
+use qf_core::ingest::{
+    Extracted, MAX_FILE_SIZE_BYTES, ParseError, extract, hash_file, walk, walk_except,
+};
 
 #[test]
 fn walk_finds_supported_files_recursively_in_path_order() {
@@ -64,6 +66,22 @@ fn walk_lists_office_lock_files_as_skipped() {
     assert!(found[0].path.ends_with("lease.docx"));
     assert_eq!(skipped.len(), 1);
     assert_eq!(skipped[0].reason, "Office lock file");
+}
+
+#[test]
+fn walk_except_leaves_out_chosen_folders_silently() {
+    let dir = tempfile::tempdir().unwrap();
+    fs::create_dir_all(dir.path().join("index")).unwrap();
+    fs::create_dir_all(dir.path().join("deals")).unwrap();
+    fs::write(dir.path().join("index/index.sqlite"), "").unwrap();
+    fs::write(dir.path().join("index/stray.txt"), "hello").unwrap();
+    fs::write(dir.path().join("deals/nda.txt"), "hello").unwrap();
+
+    let index = dir.path().join("index");
+    let (found, skipped) = walk_except(dir.path(), |p| p == index);
+    assert_eq!(found.len(), 1);
+    assert!(found[0].path.ends_with("deals/nda.txt"));
+    assert!(skipped.is_empty(), "{skipped:?}");
 }
 
 #[test]
