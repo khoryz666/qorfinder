@@ -62,18 +62,31 @@ fn recognises_clause_numbers() {
         "(a) the",
         "(iv) any",
         "(2) each",
+        "a. the Licensee",
+        "B. Recitals",
+        "iv. any",
+        "Section 5. Term",
+        "SECTION 12.3 Fees",
+        "Section 5",
+        "ARTICLE V",
+        "Article IV: Payment",
+        "ARTICLE 5",
     ] {
         assert!(is_clause_start(line), "{line}");
     }
     for line in [
         "2023 was",
         "12.",
-        "Section 5",
         "(abcde) x",
         "1.2345 x",
-        "a. b",
+        "a.b",
         "(a)b",
         "12,3 x",
+        "Sections 5 and 6",
+        "Article of association",
+        "Section",
+        "Mr. Smith",
+        "e.g. this",
     ] {
         assert!(!is_clause_start(line), "{line}");
     }
