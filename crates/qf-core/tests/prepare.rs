@@ -55,6 +55,42 @@ fn passages_point_back_into_the_original_file() {
     assert!(passages.iter().all(|p| p.page.is_none()));
 }
 
+/// CUAD counts annotation offsets in characters, as Python does. This
+/// excerpt (the first 4,500 characters of a CUAD contract, CC BY 4.0) has
+/// 2- and 3-byte characters (`é`, `®`, `•`) before a "Rofr/Rofo/Rofn"
+/// clause at characters 4100..4479, 22 bytes further in than its character
+/// offset, so any byte offset leaking through would miss it.
+#[test]
+fn passages_keep_cuad_character_offsets_after_non_ascii_text() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/cuad_playa_excerpt.txt");
+    let source = fs::read_to_string(&path).unwrap();
+    let chars: Vec<char> = source.chars().collect();
+    let (start, end) = (4100, 4479);
+    let clause: String = chars[start..end].iter().collect();
+    assert!(clause.starts_with("If the Offering Party is required to off"));
+    assert!(clause.ends_with("(collectively, the \"Offer Notice\")."));
+    assert!(source.char_indices().nth(start).unwrap().0 > start);
+
+    let config = ChunkConfig {
+        max_tokens: 40,
+        overlap: 8,
+    };
+    let passages = prepare(&path, Format::Txt, &Words, config).unwrap();
+    for p in &passages {
+        assert_eq!(p.text.chars().next(), Some(chars[p.char_start]));
+        assert_eq!(p.text.chars().next_back(), Some(chars[p.char_end - 1]));
+    }
+    let covering = passages
+        .iter()
+        .find(|p| p.char_start <= start && start < p.char_end)
+        .unwrap();
+    let original: String = chars[covering.char_start..covering.char_end]
+        .iter()
+        .collect();
+    assert!(original.contains("If the Offering Party"));
+}
+
 #[test]
 fn blank_file_has_no_text() {
     let dir = tempfile::tempdir().unwrap();
