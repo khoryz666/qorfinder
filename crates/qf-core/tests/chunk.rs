@@ -61,6 +61,7 @@ fn recognises_clause_numbers() {
         "4) Remedies",
         "(a) the",
         "(iv) any",
+        "(v) any",
         "(2) each",
         "a. the Licensee",
         "B. Recitals",
@@ -87,6 +88,8 @@ fn recognises_clause_numbers() {
         "Section",
         "Mr. Smith",
         "e.g. this",
+        "v. Jones",
+        "V. Jones",
     ] {
         assert!(!is_clause_start(line), "{line}");
     }

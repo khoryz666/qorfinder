@@ -35,7 +35,7 @@ fn trim_end(text: &str, end: usize) -> usize {
 }
 
 /// Whether a line opens a numbered clause: `12.`, `12.3`, `12.3.1`, `4)`,
-/// `(a)`, `(iv)`, `(2)`, `a.` or `iv.` followed by whitespace, or a
+/// `(a)`, `(iv)`, `(2)`, `a.` or `iv.` (but not `v.`) followed by whitespace, or a
 /// `Section 5`/`ARTICLE V` heading (any case, number or roman numeral).
 pub fn is_clause_start(line: &str) -> bool {
     let mut words = line.split_whitespace();
@@ -51,8 +51,11 @@ pub fn is_clause_start(line: &str) -> bool {
     if let Some(inner) = label.strip_prefix('(').and_then(|l| l.strip_suffix(')')) {
         return (1..=4).contains(&inner.len()) && inner.chars().all(|c| c.is_ascii_alphanumeric());
     }
+    // "v." is left out: at the start of a wrapped line it is far more often
+    // "versus" in a case citation ("v. Jones") than a clause label.
     if let Some(letters) = label.strip_suffix('.')
         && (is_single_letter(letters) || is_roman(letters))
+        && !letters.eq_ignore_ascii_case("v")
     {
         return true;
     }
