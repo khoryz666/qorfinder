@@ -10,7 +10,10 @@ permissions:
 jobs:
   linux:
     name: linux
-    runs-on: ubuntu-latest
+    # Pinned, not ubuntu-latest: the binary needs a glibc at least as new as
+    # the build image's, and Ubuntu 24.04 (glibc 2.39) is what Linux Mint 22
+    # is based on.
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
