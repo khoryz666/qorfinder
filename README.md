@@ -23,6 +23,10 @@ cargo build --release
 ./target/release/qorfinder search "can the employee work for a competitor after leaving?"
 ```
 
+A tagged release instead ships one zip per OS (`qorfinder-<tag>-linux-x86_64.zip`,
+`qorfinder-<tag>-windows-x86_64.zip`) holding the executable with the model in
+`models/all-MiniLM-L6-v2/` beside it, so it runs as unpacked with no download.
+
 `index --dry-run` prints every chunk with its character offsets and page
 instead of embedding anything, which is useful for checking extraction.
 
@@ -99,9 +103,10 @@ Layout:
 crates/qf-core/   library: ingest, chunk, embed, store, index, search
 crates/qf-cli/    the `qorfinder` binary
 scripts/          model download, CUAD preparation, reference embeddings
+licenses/         licence of the bundled model (Apache-2.0)
 ref/              proposal and IIPSPW report
 ```
 
 ## License
 
-MIT
+MIT. The bundled model is Apache-2.0; see `licenses/all-MiniLM-L6-v2.txt`.
