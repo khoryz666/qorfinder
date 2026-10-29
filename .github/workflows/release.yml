@@ -23,10 +23,24 @@ jobs:
       - name: Build release binary
         run: cargo build --release
 
+      - name: Fetch the model
+        run: python3 scripts/fetch_model.py
+
+      # The executable looks for models/all-MiniLM-L6-v2 next to itself, so
+      # the zip unpacks into a folder that runs as it is.
+      - name: Package
+        run: |
+          pkg=dist/qorfinder
+          mkdir -p "$pkg/models"
+          cp target/release/qorfinder LICENSE "$pkg/"
+          cp -r models/all-MiniLM-L6-v2 "$pkg/models/"
+          cp licenses/all-MiniLM-L6-v2.txt "$pkg/models/all-MiniLM-L6-v2/LICENSE"
+          cd dist && zip -r "qorfinder-${{ github.ref_name }}-linux-x86_64.zip" qorfinder
+
       - name: Upload release asset
         uses: softprops/action-gh-release@v2
         with:
-          files: target/release/qorfinder
+          files: dist/qorfinder-${{ github.ref_name }}-linux-x86_64.zip
           generate_release_notes: true
 
   windows:
@@ -41,7 +55,19 @@ jobs:
       - name: Build release binary
         run: cargo build --release
 
+      - name: Fetch the model
+        run: python scripts/fetch_model.py
+
+      - name: Package
+        run: |
+          $pkg = "dist/qorfinder"
+          New-Item -ItemType Directory -Force "$pkg/models" | Out-Null
+          Copy-Item target/release/qorfinder.exe, LICENSE "$pkg/"
+          Copy-Item -Recurse models/all-MiniLM-L6-v2 "$pkg/models/"
+          Copy-Item licenses/all-MiniLM-L6-v2.txt "$pkg/models/all-MiniLM-L6-v2/LICENSE"
+          Compress-Archive -Path $pkg -DestinationPath "dist/qorfinder-${{ github.ref_name }}-windows-x86_64.zip"
+
       - name: Upload release asset
         uses: softprops/action-gh-release@v2
         with:
-          files: target/release/qorfinder.exe
+          files: dist/qorfinder-${{ github.ref_name }}-windows-x86_64.zip
