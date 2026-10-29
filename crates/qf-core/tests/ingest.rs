@@ -54,6 +54,19 @@ fn walk_lists_symbolic_links_as_skipped() {
 }
 
 #[test]
+fn walk_lists_office_lock_files_as_skipped() {
+    let dir = tempfile::tempdir().unwrap();
+    fs::write(dir.path().join("lease.docx"), "PK").unwrap();
+    fs::write(dir.path().join("~$lease.docx"), [0u8; 162]).unwrap();
+
+    let (found, skipped) = walk(dir.path());
+    assert_eq!(found.len(), 1);
+    assert!(found[0].path.ends_with("lease.docx"));
+    assert_eq!(skipped.len(), 1);
+    assert_eq!(skipped[0].reason, "Office lock file");
+}
+
+#[test]
 fn walk_reports_missing_root_as_skipped() {
     let (found, skipped) = walk(std::path::Path::new("/nonexistent/qorfinder"));
     assert!(found.is_empty());

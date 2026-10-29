@@ -46,6 +46,15 @@ pub fn walk(root: &Path) -> (Vec<FoundFile>, Vec<Skipped>) {
         if !entry.file_type().is_file() {
             continue;
         }
+        // Word and other Office apps keep a `~$name.docx` lock file next to
+        // an open document; it holds no document text.
+        if entry.file_name().to_string_lossy().starts_with("~$") {
+            skipped.push(Skipped {
+                path: entry.into_path(),
+                reason: "Office lock file".into(),
+            });
+            continue;
+        }
         let Some(format) = Format::from_path(entry.path()) else {
             skipped.push(Skipped {
                 path: entry.into_path(),
