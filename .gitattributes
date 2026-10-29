@@ -1,0 +1,3 @@
+# Test fixtures must reach every OS byte for byte: CUAD offsets count
+# characters, so a CRLF checkout on Windows would shift them.
+crates/qf-core/tests/fixtures/** -text
