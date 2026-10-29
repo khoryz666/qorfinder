@@ -37,16 +37,25 @@ def load_contracts(cuad_json: Path) -> tuple[list[dict], dict[str, str]]:
     descriptions = {}
     for doc in data:
         (paragraph,) = doc["paragraphs"]  # CUAD has one context per contract
+        context = paragraph["context"]
         spans = {}
         for qa in paragraph["qas"]:
             category = qa["id"].split("__")[-1]
             descriptions[category] = qa["question"].split("Details: ", 1)[-1].strip()
-            spans[category] = [
-                (a["answer_start"], a["answer_start"] + len(a["text"]))
-                for a in qa["answers"]
-            ]
+            spans[category] = []
+            for a in qa["answers"]:
+                start = a["answer_start"]
+                end = start + len(a["text"])
+                # A mismatch here would silently mislabel every judgment
+                # built from this span, so stop instead.
+                if context[start:end] != a["text"]:
+                    sys.exit(
+                        f"{doc['title']}: {category} span {start}..{end} "
+                        "does not match its text"
+                    )
+                spans[category].append((start, end))
         contracts.append(
-            {"title": doc["title"], "context": paragraph["context"], "spans": spans}
+            {"title": doc["title"], "context": context, "spans": spans}
         )
     return contracts, descriptions
 
