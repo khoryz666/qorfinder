@@ -1687,6 +1687,7 @@ dependencies = [
  "dirs",
  "indicatif",
  "qf-core",
+ "tempfile",
  "windows-sys",
 ]
 

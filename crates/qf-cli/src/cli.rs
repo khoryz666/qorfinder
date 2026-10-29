@@ -5,7 +5,7 @@ use clap::{Args, Parser, Subcommand};
 use qf_core::chunk::{ChunkConfig, ModelTokenizer};
 use qf_core::embed::Embedder;
 use qf_core::format::snippet;
-use qf_core::index::{build_index, index_meta};
+use qf_core::index::{build_index, check_index_dir, index_meta};
 use qf_core::ingest::{Skipped, walk};
 use qf_core::prepare::prepare;
 use qf_core::search::Searcher;
@@ -137,6 +137,8 @@ fn index(folder: &Path, index_dir: &Path, model_dir: &Path, config: ChunkConfig)
     if !folder.is_dir() {
         bail!("{} is not a folder", folder.display());
     }
+    // Before the model loads, so a wrong --index-dir fails at once.
+    check_index_dir(folder, index_dir)?;
     let embedder = load_embedder(model_dir)?;
     let tokenizer = load_tokenizer(model_dir)?;
     let report = build_index(
