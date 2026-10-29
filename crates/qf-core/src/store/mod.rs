@@ -152,7 +152,9 @@ fn remove_leftovers(dir: &Path) {
             n.strip_prefix(&prefix)
                 .is_some_and(|rest| rest.is_empty() || is_counter_suffix(rest))
         });
-        if leftover {
+        // A folder that merely shares the name, such as the user's own
+        // `work.old` next to an index in `work`, is not ours to delete.
+        if leftover && is_replaceable(&entry.path()).unwrap_or(false) {
             let _ = std::fs::remove_dir_all(entry.path());
         }
     }

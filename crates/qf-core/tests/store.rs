@@ -336,6 +336,29 @@ fn install_refuses_to_replace_a_folder_of_other_files() {
 }
 
 #[test]
+fn install_keeps_a_user_folder_named_like_a_leftover() {
+    let root = tempfile::tempdir().unwrap();
+    let dir = root.path().join("work");
+    let theirs = root.path().join("work.old");
+    std::fs::create_dir(&theirs).unwrap();
+    std::fs::write(theirs.join("notes.txt"), "mine").unwrap();
+    let staging = staging_dir(&dir);
+    std::fs::create_dir(&staging).unwrap();
+    std::fs::write(staging.join("index.sqlite"), "new").unwrap();
+
+    assert!(install(&staging, &dir).unwrap().is_none());
+
+    assert_eq!(
+        std::fs::read_to_string(theirs.join("notes.txt")).unwrap(),
+        "mine"
+    );
+    assert_eq!(
+        std::fs::read_to_string(dir.join("index.sqlite")).unwrap(),
+        "new"
+    );
+}
+
+#[test]
 fn source_folder_round_trips() {
     let dir = tempfile::tempdir().unwrap();
     let store = Store::create(dir.path()).unwrap();
