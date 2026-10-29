@@ -163,6 +163,9 @@ fn index(folder: &Path, index_dir: &Path, model_dir: &Path, config: ChunkConfig)
         report.chunks as f64 / embed_secs.max(f64::EPSILON),
     );
     println!("index saved to {}", index_dir.display());
+    if let Some(line) = crate::memory::peak_line() {
+        println!("{line}");
+    }
     if let Some(warning) = &report.cleanup_warning {
         eprintln!("warning: could not delete the previous index: {warning}");
     }
@@ -205,6 +208,9 @@ fn search(
         result.encode_time.as_secs_f64() * 1e3,
         result.scan_time.as_secs_f64() * 1e3,
     );
+    if let Some(line) = crate::memory::peak_line() {
+        println!("{line}");
+    }
     Ok(())
 }
 

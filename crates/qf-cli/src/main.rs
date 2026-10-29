@@ -1,4 +1,5 @@
 mod cli;
+mod memory;
 mod progress;
 
 fn main() {
