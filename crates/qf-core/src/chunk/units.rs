@@ -36,14 +36,20 @@ fn trim_end(text: &str, end: usize) -> usize {
 
 /// Whether a line opens a numbered clause: `12.`, `12.3`, `12.3.1`, `4)`,
 /// `(a)`, `(iv)`, `(2)`, `a.` or `iv.` (but not `v.`) followed by whitespace, or a
-/// `Section 5`/`ARTICLE V` heading (any case, number or roman numeral).
+/// `Section 5`/`ARTICLE V` heading (any case, number or roman numeral)
+/// not followed by a lowercase word.
 pub fn is_clause_start(line: &str) -> bool {
     let mut words = line.split_whitespace();
     let Some(first) = words.next() else {
         return false;
     };
     if first.eq_ignore_ascii_case("section") || first.eq_ignore_ascii_case("article") {
-        return words.next().is_some_and(is_heading_number);
+        // A heading's title, if any, starts with a capital or punctuation;
+        // "Section 5 of the Act" opening a wrapped line is a reference.
+        return words.next().is_some_and(is_heading_number)
+            && words
+                .next()
+                .is_none_or(|title| !title.starts_with(|c: char| c.is_lowercase()));
     }
     let Some((label, _rest)) = line.split_once(char::is_whitespace) else {
         return false;

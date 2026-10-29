@@ -72,6 +72,7 @@ fn recognises_clause_numbers() {
         "ARTICLE V",
         "Article IV: Payment",
         "ARTICLE 5",
+        "Section 7 (Fees)",
     ] {
         assert!(is_clause_start(line), "{line}");
     }
@@ -84,6 +85,8 @@ fn recognises_clause_numbers() {
         "(a)b",
         "12,3 x",
         "Sections 5 and 6",
+        "Section 5 of the Act applies",
+        "Article 12 shall survive",
         "Article of association",
         "Section",
         "Mr. Smith",
