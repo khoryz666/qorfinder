@@ -10,7 +10,7 @@ candle-core = "0.11"
 candle-nn = "0.11"
 candle-transformers = "0.11"
 docx-rs = "0.4"
-lopdf = "0.36"
+pdf-extract = "0.12"
 rayon = "1"
 rusqlite = { version = "0.41", features = ["bundled"] }
 serde_json = "1"
@@ -21,4 +21,6 @@ unicode-normalization = "0.1"
 walkdir = "2"
 
 [dev-dependencies]
+# Builds the test PDFs; the same lopdf version pdf-extract uses.
+lopdf = "0.42"
 tempfile = "3"

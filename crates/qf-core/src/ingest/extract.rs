@@ -74,9 +74,11 @@ fn extract_txt(path: &Path) -> Result<Extracted, ParseError> {
 }
 
 /// PDF text, one page at a time so every page's start offset is known.
-/// Pages are separated by a paragraph break. lopdf can panic on malformed
-/// files, so the whole parse runs under `catch_unwind` and a panic becomes
-/// an ordinary parse error.
+/// Pages are separated by a paragraph break. The text comes from
+/// pdf-extract, which decodes font encodings that lopdf's own
+/// `extract_text` cannot (lopdf alone got no text from any CUAD PDF).
+/// Both can panic on malformed files, so the whole parse runs under
+/// `catch_unwind` and a panic becomes an ordinary parse error.
 fn extract_pdf(path: &Path) -> Result<Extracted, ParseError> {
     let bytes = std::fs::read(path)?;
     std::panic::catch_unwind(|| extract_pdf_bytes(&bytes))
@@ -84,10 +86,13 @@ fn extract_pdf(path: &Path) -> Result<Extracted, ParseError> {
 }
 
 fn extract_pdf_bytes(bytes: &[u8]) -> Result<Extracted, ParseError> {
-    let doc = lopdf::Document::load_mem(bytes).map_err(|e| ParseError::Format(e.to_string()))?;
-    // lopdf already tries the empty user password on load, so a document
-    // that is still encrypted here needs a password we do not have.
-    if doc.is_encrypted() {
+    let mut doc = pdf_extract::Document::load_mem(bytes).map_err(|e| match e {
+        pdf_extract::Error::Decryption(_) => ParseError::Encrypted,
+        e => ParseError::Format(e.to_string()),
+    })?;
+    // Many PDFs are encrypted with an empty user password only to set
+    // permissions; those open. Anything else needs a password we lack.
+    if doc.is_encrypted() && doc.decrypt("").is_err() {
         return Err(ParseError::Encrypted);
     }
     let mut out = Extracted::default();
@@ -100,7 +105,11 @@ fn extract_pdf_bytes(bytes: &[u8]) -> Result<Extracted, ParseError> {
         out.pages.push((chars, page_no));
         // A page whose content stream cannot be decoded contributes no text
         // rather than failing the whole document.
-        let text = doc.extract_text(&[page_no]).unwrap_or_default();
+        let mut text = String::new();
+        let mut output = pdf_extract::PlainTextOutput::new(&mut text);
+        if pdf_extract::output_doc_page(&doc, &mut output, page_no).is_err() {
+            text.clear();
+        }
         chars += text.chars().count();
         out.text.push_str(&text);
     }
