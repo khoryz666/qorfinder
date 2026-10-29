@@ -4,7 +4,7 @@ use std::path::Path;
 
 use crate::Format;
 use crate::chunk::{ChunkConfig, Tokenize, TokenizeError, chunk_text};
-use crate::ingest::{ParseError, extract, normalize};
+use crate::ingest::{ParseError, extract, normalize, normalize_pdf};
 
 #[derive(Debug, thiserror::Error)]
 pub enum PrepareError {
@@ -38,7 +38,11 @@ pub fn prepare(
     config: ChunkConfig,
 ) -> Result<Vec<Passage>, PrepareError> {
     let extracted = extract(path, format)?;
-    let normalized = normalize(&extracted.text);
+    // Only PDF layout breaks words across lines with a hyphen.
+    let normalized = match format {
+        Format::Pdf => normalize_pdf(&extracted.text),
+        Format::Docx | Format::Txt => normalize(&extracted.text),
+    };
     let spans = chunk_text(&normalized.text, tokenizer, config).map_err(PrepareError::Tokenize)?;
     if spans.is_empty() {
         return Err(PrepareError::Empty);

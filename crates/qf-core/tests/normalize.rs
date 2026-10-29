@@ -1,4 +1,4 @@
-use qf_core::ingest::normalize;
+use qf_core::ingest::{normalize, normalize_pdf};
 
 #[test]
 fn collapses_spaces_and_trims_lines() {
@@ -13,12 +13,18 @@ fn keeps_paragraph_breaks_as_two_newlines() {
 }
 
 #[test]
-fn joins_words_hyphenated_across_lines() {
-    let n = normalize("the con-\n  tract is bind-\ning; a well-\nKnown term; non-\n\ncompete");
+fn pdf_text_joins_words_hyphenated_across_lines() {
+    let n = normalize_pdf("the con-\n  tract is bind-\ning; a well-\nKnown term; non-\n\ncompete");
     assert_eq!(
         n.text,
         "the contract is binding; a well-\nKnown term; non-\n\ncompete"
     );
+}
+
+#[test]
+fn typed_text_keeps_hyphens_at_line_ends() {
+    let n = normalize("a third-\nparty licence");
+    assert_eq!(n.text, "a third-\nparty licence");
 }
 
 #[test]
@@ -34,7 +40,7 @@ fn applies_nfc() {
 #[test]
 fn source_range_maps_back_to_the_original_text() {
     let source = "  Section   12.3\n\n\nThe Licensee shall pay   royal-\nties.";
-    let n = normalize(source);
+    let n = normalize_pdf(source);
     assert_eq!(n.text, "Section 12.3\n\nThe Licensee shall pay royalties.");
     let src: Vec<char> = source.chars().collect();
     let slice = |(s, e): (usize, usize)| src[s..e].iter().collect::<String>();

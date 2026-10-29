@@ -33,13 +33,24 @@ impl Normalized {
 ///
 /// * Unicode NFC, so the same word always has the same code points;
 /// * line endings become `\n`;
-/// * a word split across lines with `-\n` is joined (`con-\ntract` becomes
-///   `contract`);
 /// * runs of spaces and tabs become one space, and whitespace at the start
 ///   and end of every line is dropped;
 /// * one line break stays `\n`, and two or more (a paragraph break) become
 ///   exactly `\n\n`.
+///
+/// Hyphens at line ends are kept: in typed text such as TXT or DOCX,
+/// `third-\nparty` is a real hyphenated word. See [`normalize_pdf`].
 pub fn normalize(text: &str) -> Normalized {
+    normalize_with(text, false)
+}
+
+/// [`normalize`], and also join a word that PDF layout split across lines
+/// with `-\n` (`con-\ntract` becomes `contract`).
+pub fn normalize_pdf(text: &str) -> Normalized {
+    normalize_with(text, true)
+}
+
+fn normalize_with(text: &str, join_hyphens: bool) -> Normalized {
     let chars = nfc_with_sources(text);
     let mut out = Normalized {
         text: String::with_capacity(text.len()),
@@ -49,7 +60,7 @@ pub fn normalize(text: &str) -> Normalized {
     while i < chars.len() {
         let (c, span) = chars[i];
         if !c.is_whitespace() {
-            if c == '-' && is_hyphen_break(&out.text, &chars, i) {
+            if join_hyphens && c == '-' && is_hyphen_break(&out.text, &chars, i) {
                 // Skip the hyphen and the line break after it.
                 i += 1;
                 while chars[i].0.is_whitespace() {

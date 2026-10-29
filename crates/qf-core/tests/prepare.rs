@@ -38,7 +38,7 @@ fn passages_point_back_into_the_original_file() {
         texts,
         [
             "1. Licence. The Licensor grants a\nnon-exclusive licence.",
-            "2. Royalties. The Licensee pays 5%."
+            "2. Royal-\nties. The Licensee pays 5%."
         ]
     );
     let chars: Vec<char> = source.chars().collect();
