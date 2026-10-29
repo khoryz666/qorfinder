@@ -77,6 +77,7 @@ fn indexes_a_folder_and_skips_bad_files() {
     .unwrap();
 
     assert_eq!(report.documents, 2);
+    assert!(!qf_core::store::staging_dir(index_dir.path()).exists());
     assert_eq!(report.skipped.len(), 1);
     assert!(report.skipped[0].path.ends_with("broken.pdf"));
 

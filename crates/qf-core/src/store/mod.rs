@@ -3,6 +3,7 @@
 
 mod vectors;
 
+use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
 pub use vectors::{VectorWriter, read_vectors};
@@ -57,6 +58,45 @@ CREATE TABLE chunks (
     page       INTEGER
 );
 ";
+
+/// The folder an index is built in before it replaces `dir`: a sibling
+/// named like `dir` plus `.partial`. Building there means a run that fails
+/// or is interrupted leaves the previous index usable.
+pub fn staging_dir(dir: &Path) -> PathBuf {
+    sibling(dir, ".partial")
+}
+
+/// Move a finished index from `staging` into `dir`, replacing the index
+/// that was there. The old index is moved aside first and deleted only
+/// once the new one is in place.
+pub fn install(staging: &Path, dir: &Path) -> Result<(), StoreError> {
+    let old = sibling(dir, ".old");
+    if old.exists() {
+        std::fs::remove_dir_all(&old)?;
+    }
+    if dir.exists() {
+        std::fs::rename(dir, &old)?;
+    }
+    if let Err(err) = std::fs::rename(staging, dir) {
+        if old.exists() {
+            std::fs::rename(&old, dir)?;
+        }
+        return Err(err.into());
+    }
+    if old.exists() {
+        std::fs::remove_dir_all(&old)?;
+    }
+    Ok(())
+}
+
+/// `dir` with `suffix` appended to its last component.
+fn sibling(dir: &Path, suffix: &str) -> PathBuf {
+    let mut name = dir
+        .file_name()
+        .map_or_else(|| OsString::from("index"), OsString::from);
+    name.push(suffix);
+    dir.with_file_name(name)
+}
 
 /// Documents and chunks of one index.
 pub struct Store {

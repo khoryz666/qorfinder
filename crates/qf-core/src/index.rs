@@ -10,7 +10,7 @@ use crate::chunk::{ChunkConfig, Tokenize};
 use crate::embed::{BATCH_SIZE, EmbedError, Embedder, MODEL_ID};
 use crate::ingest::{Skipped, hash_file, walk};
 use crate::prepare::prepare;
-use crate::store::{Store, StoreError, VECTORS_FILE, VectorWriter};
+use crate::store::{Store, StoreError, VECTORS_FILE, VectorWriter, install, staging_dir};
 use crate::{Chunk, Document, IndexMeta};
 
 #[derive(Debug, thiserror::Error)]
@@ -66,8 +66,10 @@ pub fn index_meta(embedder: &Embedder, config: ChunkConfig) -> IndexMeta {
 }
 
 /// Index every supported file under `folder` into `index_dir`, replacing
-/// whatever index was there. Files that cannot be read are skipped with a
-/// reason and never stop the run.
+/// whatever index was there. The new index is built beside it and only
+/// moved into place once complete, so a failed or interrupted run keeps
+/// the old one. Files that cannot be read are skipped with a reason and
+/// never stop the run.
 pub fn build_index(
     folder: &Path,
     index_dir: &Path,
@@ -132,9 +134,13 @@ pub fn build_index(
     }
     let prepare_time = started.elapsed();
 
-    let mut store = Store::create(index_dir)?;
+    let staging = staging_dir(index_dir);
+    if staging.exists() {
+        std::fs::remove_dir_all(&staging).map_err(StoreError::from)?;
+    }
+    let mut store = Store::create(&staging)?;
     let embed_started = Instant::now();
-    let mut vectors = VectorWriter::create(&index_dir.join(VECTORS_FILE), embedder.dim())?;
+    let mut vectors = VectorWriter::create(&staging.join(VECTORS_FILE), embedder.dim())?;
     progress.start(Stage::Embedding, chunks.len());
     for batch in chunks.chunks(BATCH_SIZE) {
         let texts: Vec<&str> = batch.iter().map(|c| c.text.as_str()).collect();
@@ -152,6 +158,10 @@ pub fn build_index(
     // Written last: an index whose run was cut short has no meta and is
     // refused instead of being searched half-built.
     store.write_meta(&index_meta(embedder, config))?;
+    // Close the database before the folder is renamed (Windows refuses to
+    // move open files).
+    drop(store);
+    install(&staging, index_dir)?;
 
     Ok(IndexReport {
         documents: documents.len(),

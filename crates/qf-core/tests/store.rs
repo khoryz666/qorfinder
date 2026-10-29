@@ -1,6 +1,6 @@
 use std::path::PathBuf;
 
-use qf_core::store::{Store, StoreError, VectorWriter, read_vectors};
+use qf_core::store::{Store, StoreError, VectorWriter, install, read_vectors, staging_dir};
 use qf_core::{Chunk, Document, Format, IndexMeta};
 
 fn document(id: u32) -> Document {
@@ -157,4 +157,48 @@ fn index_without_meta_is_corrupt() {
     let dir = tempfile::tempdir().unwrap();
     let store = Store::create(dir.path()).unwrap();
     assert!(matches!(store.read_meta(), Err(StoreError::Corrupt(_))));
+}
+
+#[test]
+fn staging_folder_sits_beside_the_index() {
+    let dir = PathBuf::from("/data/qorfinder/index");
+    assert_eq!(
+        staging_dir(&dir),
+        PathBuf::from("/data/qorfinder/index.partial")
+    );
+}
+
+#[test]
+fn install_swaps_in_the_new_index_and_removes_the_old() {
+    let root = tempfile::tempdir().unwrap();
+    let dir = root.path().join("index");
+    let staging = staging_dir(&dir);
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("which"), "old").unwrap();
+    std::fs::create_dir_all(&staging).unwrap();
+    std::fs::write(staging.join("which"), "new").unwrap();
+
+    install(&staging, &dir).unwrap();
+
+    assert_eq!(std::fs::read_to_string(dir.join("which")).unwrap(), "new");
+    let mut left: Vec<_> = std::fs::read_dir(root.path())
+        .unwrap()
+        .map(|e| e.unwrap().file_name())
+        .collect();
+    left.sort();
+    assert_eq!(left, ["index"]);
+}
+
+#[test]
+fn install_works_when_there_is_no_old_index() {
+    let root = tempfile::tempdir().unwrap();
+    let dir = root.path().join("index");
+    let staging = staging_dir(&dir);
+    std::fs::create_dir_all(&staging).unwrap();
+    std::fs::write(staging.join("which"), "new").unwrap();
+
+    install(&staging, &dir).unwrap();
+
+    assert_eq!(std::fs::read_to_string(dir.join("which")).unwrap(), "new");
+    assert!(!staging.exists());
 }
