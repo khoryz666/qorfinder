@@ -203,19 +203,37 @@ fn install_works_when_there_is_no_old_index() {
     assert!(!staging.exists());
 }
 
+/// Make `folder`'s contents undeletable by making it read-only. Returns
+/// false where that has no effect: root ignores the permission.
+#[cfg(unix)]
+fn lock(folder: &std::path::Path) -> bool {
+    use std::os::unix::fs::PermissionsExt;
+
+    std::fs::set_permissions(folder, std::fs::Permissions::from_mode(0o555)).unwrap();
+    std::fs::write(folder.join("probe"), "").is_err()
+}
+
+#[cfg(unix)]
+fn unlock(folder: &std::path::Path) {
+    use std::os::unix::fs::PermissionsExt;
+
+    std::fs::set_permissions(folder, std::fs::Permissions::from_mode(0o755)).unwrap();
+}
+
 /// A file in the old index that cannot be deleted leaves the old folder
 /// behind, but the new index is installed and the call succeeds.
 #[cfg(unix)]
 #[test]
 fn install_succeeds_when_the_old_index_cannot_be_deleted() {
-    use std::os::unix::fs::PermissionsExt;
-
     let root = tempfile::tempdir().unwrap();
     let dir = root.path().join("index");
     let locked = dir.join("locked");
     std::fs::create_dir_all(&locked).unwrap();
     std::fs::write(locked.join("file"), "old").unwrap();
-    std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o555)).unwrap();
+    if !lock(&locked) {
+        unlock(&locked);
+        return;
+    }
     let staging = staging_dir(&dir);
     std::fs::create_dir_all(&staging).unwrap();
     std::fs::write(staging.join("which"), "new").unwrap();
@@ -223,7 +241,7 @@ fn install_succeeds_when_the_old_index_cannot_be_deleted() {
     let warning = install(&staging, &dir).unwrap();
 
     let old = root.path().join("index.old");
-    std::fs::set_permissions(old.join("locked"), std::fs::Permissions::from_mode(0o755)).unwrap();
+    unlock(&old.join("locked"));
     assert!(warning.is_some());
     assert_eq!(std::fs::read_to_string(dir.join("which")).unwrap(), "new");
     assert!(old.exists());
