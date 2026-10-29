@@ -1,7 +1,7 @@
 //! Build an index from a folder: walk, prepare every file in parallel,
 //! embed all chunks in batches, then write the store.
 
-use std::path::Path;
+use std::path::{Component, Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use rayon::prelude::*;
@@ -21,6 +21,13 @@ pub enum IndexError {
     Store(#[from] StoreError),
     #[error("embedding failed: {0}")]
     Embed(#[from] EmbedError),
+    #[error(
+        "the index folder {} and the indexed folder {} overlap; keep the index \
+         outside the documents",
+        index.display(),
+        folder.display()
+    )]
+    Overlap { index: PathBuf, folder: PathBuf },
 }
 
 /// What an indexing run did and how long each part took.
@@ -70,6 +77,58 @@ pub fn index_meta(embedder: &Embedder, config: ChunkConfig) -> IndexMeta {
     }
 }
 
+/// Check that indexing `folder` into `index_dir` cannot touch the user's
+/// files: neither folder may contain the other (or be the same), and the
+/// index folder and its staging folder must be missing, empty or an
+/// index. Run before any work, so a mistyped path fails at once.
+pub fn check_index_dir(folder: &Path, index_dir: &Path) -> Result<(), IndexError> {
+    let index = resolve(index_dir).map_err(StoreError::from)?;
+    let source = resolve(folder).map_err(StoreError::from)?;
+    if index.starts_with(&source) || source.starts_with(&index) {
+        return Err(IndexError::Overlap {
+            index: index_dir.to_path_buf(),
+            folder: folder.to_path_buf(),
+        });
+    }
+    ensure_replaceable(index_dir)?;
+    ensure_replaceable(&staging_dir(index_dir))?;
+    Ok(())
+}
+
+/// `path` made absolute with symbolic links and `..` resolved, also when it
+/// does not exist yet: its nearest existing ancestor is canonicalised and
+/// the rest appended. The appended parts do not exist, so they hold no
+/// symbolic links and their `..` can be resolved by dropping a component.
+fn resolve(path: &Path) -> std::io::Result<PathBuf> {
+    let path = std::path::absolute(path)?;
+    let mut existing = path.as_path();
+    let mut rest = Vec::new();
+    let mut resolved = loop {
+        match existing.canonicalize() {
+            Ok(base) => break base,
+            Err(err) => {
+                let (Some(parent), Some(last)) =
+                    (existing.parent(), existing.components().next_back())
+                else {
+                    return Err(err);
+                };
+                rest.push(last);
+                existing = parent;
+            }
+        }
+    };
+    for part in rest.into_iter().rev() {
+        match part {
+            Component::ParentDir => {
+                resolved.pop();
+            }
+            Component::CurDir => {}
+            part => resolved.push(part),
+        }
+    }
+    Ok(resolved)
+}
+
 /// Index every supported file under `folder` into `index_dir`, replacing
 /// whatever index was there. The new index is built beside it and only
 /// moved into place once complete, so a failed or interrupted run keeps
@@ -83,6 +142,7 @@ pub fn build_index(
     config: ChunkConfig,
     progress: &impl Progress,
 ) -> Result<IndexReport, IndexError> {
+    check_index_dir(folder, index_dir)?;
     let started = Instant::now();
     let (files, mut skipped) = walk(folder);
     progress.start(Stage::Preparing, files.len());
@@ -140,7 +200,6 @@ pub fn build_index(
     let prepare_time = started.elapsed();
 
     let staging = staging_dir(index_dir);
-    ensure_replaceable(&staging)?;
     if staging.exists() {
         std::fs::remove_dir_all(&staging).map_err(StoreError::from)?;
     }

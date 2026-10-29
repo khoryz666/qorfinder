@@ -171,3 +171,47 @@ fn saved_index_is_searched_after_reopening() {
     };
     assert!(Searcher::open(index_dir.path(), &embedder, &other).is_err());
 }
+
+#[test]
+fn index_folder_must_not_overlap_the_documents() {
+    use qf_core::index::{IndexError, check_index_dir};
+
+    let root = tempfile::tempdir().unwrap();
+    let docs = root.path().join("contracts");
+    fs::create_dir(&docs).unwrap();
+    let overlap = |index: PathBuf| {
+        matches!(
+            check_index_dir(&docs, &index),
+            Err(IndexError::Overlap { .. })
+        )
+    };
+    assert!(overlap(docs.clone()));
+    assert!(overlap(docs.join("index")));
+    assert!(overlap(docs.join("sub/../index")));
+    assert!(overlap(root.path().to_path_buf()));
+    assert!(check_index_dir(&docs, &root.path().join("index")).is_ok());
+    // A sibling whose name merely starts the same is not inside.
+    assert!(check_index_dir(&docs, &root.path().join("contracts-index")).is_ok());
+}
+
+#[test]
+fn index_folder_of_other_files_is_refused_before_any_work() {
+    use qf_core::index::{IndexError, check_index_dir};
+    use qf_core::store::StoreError;
+
+    let root = tempfile::tempdir().unwrap();
+    let docs = root.path().join("contracts");
+    fs::create_dir(&docs).unwrap();
+    let work = root.path().join("work");
+    fs::create_dir(&work).unwrap();
+    fs::write(work.join("memo.txt"), "mine").unwrap();
+    assert!(matches!(
+        check_index_dir(&docs, &work),
+        Err(IndexError::Store(StoreError::NotAnIndex(_)))
+    ));
+    let partial = root.path().join("index.partial");
+    fs::create_dir(&partial).unwrap();
+    fs::write(partial.join("memo.txt"), "mine").unwrap();
+    assert!(check_index_dir(&docs, &root.path().join("index")).is_err());
+    assert_eq!(fs::read_to_string(work.join("memo.txt")).unwrap(), "mine");
+}
