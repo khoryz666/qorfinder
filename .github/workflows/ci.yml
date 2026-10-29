@@ -21,16 +21,22 @@ jobs:
       - name: Cache cargo artifacts
         uses: Swatinem/rust-cache@v2
 
+      # --ignore-environment hides the runner's own cargo, Node and Python,
+      # so a tool missing from the flake fails here instead of being found
+      # on the runner's PATH (test case T14).
       - name: Check formatting
-        run: nix develop --command cargo fmt --all -- --check
+        run: nix develop --ignore-environment --keep HOME --command cargo fmt --all -- --check
 
       - name: Lint
-        run: nix develop --command cargo clippy --workspace --all-targets -- -D warnings
+        run: nix develop --ignore-environment --keep HOME --command cargo clippy --workspace --all-targets -- -D warnings
 
       # Tests that need the model files under models/ are #[ignore]d, so
       # this stays offline and fast.
       - name: Test
-        run: nix develop --command cargo test --workspace
+        run: nix develop --ignore-environment --keep HOME --command cargo test --workspace
+
+      - name: Check the scoring tools
+        run: nix develop --ignore-environment --keep HOME --command python3 -c "import ranx, scipy"
 
   windows:
     name: windows
