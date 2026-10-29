@@ -41,7 +41,7 @@ the settings it was built with.
 
 ## How it works
 
-1. **Ingest**: walk the folder; extract text per format (lopdf page by
+1. **Ingest**: walk the folder; extract text per format (pdf-extract page by
    page, docx-rs paragraphs, UTF-8 text); skip encrypted PDFs, PDFs with no
    text layer and files over 50 MB; normalise to NFC, join hyphenated line
    breaks, collapse spaces and keep paragraph breaks, remembering where every
