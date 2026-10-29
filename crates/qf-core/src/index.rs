@@ -27,6 +27,9 @@ pub struct IndexReport {
     pub documents: usize,
     pub chunks: usize,
     pub skipped: Vec<Skipped>,
+    /// Why the replaced index could not be deleted, if it could not. The
+    /// new index is in place either way.
+    pub cleanup_warning: Option<String>,
     /// Walking, extracting, normalising and chunking.
     pub prepare_time: Duration,
     /// The embedding loop alone.
@@ -173,12 +176,13 @@ pub fn build_index(
     // Close the database before the folder is renamed (Windows refuses to
     // move open files).
     drop(store);
-    install(&staging, index_dir)?;
+    let cleanup_warning = install(&staging, index_dir)?.map(|err| err.to_string());
 
     Ok(IndexReport {
         documents: documents.len(),
         chunks: chunks.len(),
         skipped,
+        cleanup_warning,
         prepare_time,
         embed_time,
         total_time: started.elapsed(),

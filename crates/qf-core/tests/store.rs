@@ -178,7 +178,7 @@ fn install_swaps_in_the_new_index_and_removes_the_old() {
     std::fs::create_dir_all(&staging).unwrap();
     std::fs::write(staging.join("which"), "new").unwrap();
 
-    install(&staging, &dir).unwrap();
+    assert!(install(&staging, &dir).unwrap().is_none());
 
     assert_eq!(std::fs::read_to_string(dir.join("which")).unwrap(), "new");
     let mut left: Vec<_> = std::fs::read_dir(root.path())
@@ -197,10 +197,36 @@ fn install_works_when_there_is_no_old_index() {
     std::fs::create_dir_all(&staging).unwrap();
     std::fs::write(staging.join("which"), "new").unwrap();
 
-    install(&staging, &dir).unwrap();
+    assert!(install(&staging, &dir).unwrap().is_none());
 
     assert_eq!(std::fs::read_to_string(dir.join("which")).unwrap(), "new");
     assert!(!staging.exists());
+}
+
+/// A file in the old index that cannot be deleted leaves the old folder
+/// behind, but the new index is installed and the call succeeds.
+#[cfg(unix)]
+#[test]
+fn install_succeeds_when_the_old_index_cannot_be_deleted() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let root = tempfile::tempdir().unwrap();
+    let dir = root.path().join("index");
+    let locked = dir.join("locked");
+    std::fs::create_dir_all(&locked).unwrap();
+    std::fs::write(locked.join("file"), "old").unwrap();
+    std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o555)).unwrap();
+    let staging = staging_dir(&dir);
+    std::fs::create_dir_all(&staging).unwrap();
+    std::fs::write(staging.join("which"), "new").unwrap();
+
+    let warning = install(&staging, &dir).unwrap();
+
+    let old = root.path().join("index.old");
+    std::fs::set_permissions(old.join("locked"), std::fs::Permissions::from_mode(0o755)).unwrap();
+    assert!(warning.is_some());
+    assert_eq!(std::fs::read_to_string(dir.join("which")).unwrap(), "new");
+    assert!(old.exists());
 }
 
 #[test]

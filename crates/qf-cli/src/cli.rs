@@ -163,6 +163,9 @@ fn index(folder: &Path, index_dir: &Path, model_dir: &Path, config: ChunkConfig)
         report.chunks as f64 / embed_secs.max(f64::EPSILON),
     );
     println!("index saved to {}", index_dir.display());
+    if let Some(warning) = &report.cleanup_warning {
+        eprintln!("warning: could not delete the previous index: {warning}");
+    }
     Ok(())
 }
 

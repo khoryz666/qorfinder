@@ -68,8 +68,10 @@ pub fn staging_dir(dir: &Path) -> PathBuf {
 
 /// Move a finished index from `staging` into `dir`, replacing the index
 /// that was there. The old index is moved aside first and deleted only
-/// once the new one is in place.
-pub fn install(staging: &Path, dir: &Path) -> Result<(), StoreError> {
+/// once the new one is in place. Failing to delete it (say, a file locked
+/// by antivirus) does not undo the install: the error is returned in `Ok`
+/// as a warning, and the next run removes the leftover folder.
+pub fn install(staging: &Path, dir: &Path) -> Result<Option<std::io::Error>, StoreError> {
     let old = sibling(dir, ".old");
     if old.exists() {
         std::fs::remove_dir_all(&old)?;
@@ -84,9 +86,9 @@ pub fn install(staging: &Path, dir: &Path) -> Result<(), StoreError> {
         return Err(err.into());
     }
     if old.exists() {
-        std::fs::remove_dir_all(&old)?;
+        return Ok(std::fs::remove_dir_all(&old).err());
     }
-    Ok(())
+    Ok(None)
 }
 
 /// `dir` with `suffix` appended to its last component.
