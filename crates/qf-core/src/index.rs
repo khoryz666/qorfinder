@@ -166,6 +166,9 @@ pub fn build_index(
     store.insert_chunks(&chunks)?;
     // Written last: an index whose run was cut short has no meta and is
     // refused instead of being searched half-built.
+    // Absolute, so a rebuild works whatever folder it is started from.
+    let source = std::path::absolute(folder).map_err(StoreError::from)?;
+    store.write_source_folder(&source)?;
     store.write_meta(&index_meta(embedder, config))?;
     // Close the database before the folder is renamed (Windows refuses to
     // move open files).

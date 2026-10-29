@@ -202,3 +202,17 @@ fn install_works_when_there_is_no_old_index() {
     assert_eq!(std::fs::read_to_string(dir.join("which")).unwrap(), "new");
     assert!(!staging.exists());
 }
+
+#[test]
+fn source_folder_round_trips() {
+    let dir = tempfile::tempdir().unwrap();
+    let store = Store::create(dir.path()).unwrap();
+    assert_eq!(store.source_folder().unwrap(), None);
+    store
+        .write_source_folder(std::path::Path::new("/home/user/contracts"))
+        .unwrap();
+    assert_eq!(
+        store.source_folder().unwrap(),
+        Some(PathBuf::from("/home/user/contracts"))
+    );
+}

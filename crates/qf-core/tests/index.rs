@@ -83,6 +83,10 @@ fn indexes_a_folder_and_skips_bad_files() {
 
     let store = Store::open(index_dir.path()).unwrap();
     store.check_meta(&index_meta(&embedder, config)).unwrap();
+    assert_eq!(
+        store.source_folder().unwrap(),
+        Some(std::path::absolute(docs.path()).unwrap())
+    );
     assert_eq!(store.chunk_count().unwrap(), report.chunks);
     // Walk order: broken.pdf is skipped, lease.txt is document 0.
     assert_eq!(

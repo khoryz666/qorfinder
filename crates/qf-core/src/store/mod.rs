@@ -152,6 +152,29 @@ impl Store {
         Ok(())
     }
 
+    /// Record the folder the index was built from, so it can be rebuilt
+    /// from the same place later (FR8). Not part of the settings check.
+    pub fn write_source_folder(&self, folder: &Path) -> Result<(), StoreError> {
+        self.conn.execute(
+            "INSERT OR REPLACE INTO meta (key, value) VALUES ('source_folder', ?1)",
+            [folder.to_string_lossy()],
+        )?;
+        Ok(())
+    }
+
+    /// The folder the index was built from, if recorded.
+    pub fn source_folder(&self) -> Result<Option<PathBuf>, StoreError> {
+        Ok(self
+            .conn
+            .query_row(
+                "SELECT value FROM meta WHERE key = 'source_folder'",
+                [],
+                |r| r.get::<_, String>(0),
+            )
+            .optional()?
+            .map(PathBuf::from))
+    }
+
     pub fn read_meta(&self) -> Result<IndexMeta, StoreError> {
         let get = |key: &str| -> Result<String, StoreError> {
             self.conn
