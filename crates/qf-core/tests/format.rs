@@ -17,6 +17,16 @@ fn long_text_is_cut_with_an_ellipsis() {
 }
 
 #[test]
+fn long_text_is_cut_between_words() {
+    assert_eq!(snippet("its terms apply", 7), "its…");
+    assert_eq!(snippet("its terms apply", 9), "its terms…");
+    assert_eq!(
+        snippet("Licensee shall not assign", 20),
+        "Licensee shall not…"
+    );
+}
+
+#[test]
 fn wraps_at_spaces_within_the_width() {
     assert_eq!(
         wrap("The Licensee  shall not\nassign this Agreement.", 16),

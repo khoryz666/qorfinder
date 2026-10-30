@@ -1,14 +1,24 @@
 //! Text helpers for showing results.
 
 /// `text` on one line with runs of whitespace collapsed, cut to at most
-/// `max_chars` characters plus an ellipsis when it is longer.
+/// `max_chars` characters plus an ellipsis when it is longer. The cut falls
+/// between words when the kept text has a space to cut at.
 pub fn snippet(text: &str, max_chars: usize) -> String {
     let flat = text.split_whitespace().collect::<Vec<_>>().join(" ");
     if flat.chars().count() <= max_chars {
         return flat;
     }
-    let head: String = flat.chars().take(max_chars).collect();
-    format!("{}…", head.trim_end())
+    // One character more than fits, so a word ending exactly at the limit
+    // is kept; then back up to the last space, unless there is none.
+    let head: String = flat.chars().take(max_chars + 1).collect();
+    let cut = match head.rfind(' ') {
+        Some(space) if space > 0 => &head[..space],
+        _ => head
+            .char_indices()
+            .nth(max_chars)
+            .map_or(head.as_str(), |(i, _)| &head[..i]),
+    };
+    format!("{}…", cut.trim_end())
 }
 
 /// `text` broken into lines of at most `width` characters at spaces, with
