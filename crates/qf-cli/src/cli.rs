@@ -1,3 +1,4 @@
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
@@ -134,6 +135,7 @@ fn default_index_dir() -> PathBuf {
 }
 
 fn index(folder: &Path, index_dir: &Path, model_dir: &Path, config: ChunkConfig) -> Result<()> {
+    let mut out = std::io::stdout().lock();
     if !folder.is_dir() {
         bail!("{} is not a folder", folder.display());
     }
@@ -150,10 +152,11 @@ fn index(folder: &Path, index_dir: &Path, model_dir: &Path, config: ChunkConfig)
         &Bars::default(),
     )?;
     for s in &report.skipped {
-        println!("skipped {}: {}", s.path.display(), s.reason);
+        writeln!(out, "skipped {}: {}", s.path.display(), s.reason)?;
     }
     let embed_secs = report.embed_time.as_secs_f64();
-    println!(
+    writeln!(
+        out,
         "indexed {} document(s), {} chunk(s), {} skipped, in {:.1} s \
          (prepare {:.1} s, embed {:.1} s, {:.1} chunks/s)",
         report.documents,
@@ -163,10 +166,10 @@ fn index(folder: &Path, index_dir: &Path, model_dir: &Path, config: ChunkConfig)
         report.prepare_time.as_secs_f64(),
         embed_secs,
         report.chunks as f64 / embed_secs.max(f64::EPSILON),
-    );
-    println!("index saved to {}", index_dir.display());
+    )?;
+    writeln!(out, "index saved to {}", index_dir.display())?;
     if let Some(line) = crate::memory::peak_line() {
-        println!("{line}");
+        writeln!(out, "{line}")?;
     }
     if let Some(warning) = &report.cleanup_warning {
         eprintln!("warning: could not delete the previous index: {warning}");
@@ -181,6 +184,7 @@ fn search(
     model_dir: &Path,
     config: ChunkConfig,
 ) -> Result<()> {
+    let mut out = std::io::stdout().lock();
     let embedder = load_embedder(model_dir)?;
     let searcher = Searcher::open(index_dir, &embedder, &index_meta(&embedder, config))?;
     let result = searcher.search(query, k)?;
@@ -193,7 +197,8 @@ fn search(
             .document(chunk.doc_id)?
             .with_context(|| format!("document {} missing from the index", chunk.doc_id))?;
         let page = chunk.page.map_or(String::new(), |n| format!(" p.{n}"));
-        println!(
+        writeln!(
+            out,
             "{:>2}. {:.4}  {}{page} [{}..{}]\n    {}",
             rank + 1,
             hit.score,
@@ -201,17 +206,18 @@ fn search(
             chunk.char_start,
             chunk.char_end,
             snippet(&chunk.text, 240)
-        );
+        )?;
     }
-    println!(
+    writeln!(
+        out,
         "{} result(s) in {:.1} ms (encode {:.1} ms, scan {:.1} ms)",
         result.hits.len(),
         (result.encode_time + result.scan_time).as_secs_f64() * 1e3,
         result.encode_time.as_secs_f64() * 1e3,
         result.scan_time.as_secs_f64() * 1e3,
-    );
+    )?;
     if let Some(line) = crate::memory::peak_line() {
-        println!("{line}");
+        writeln!(out, "{line}")?;
     }
     Ok(())
 }
@@ -219,21 +225,23 @@ fn search(
 /// Print every chunk the indexer would store, with its offsets into the
 /// extracted text and its page, without embedding anything.
 fn dry_run_index(folder: &Path, model_dir: &Path, config: ChunkConfig) -> Result<()> {
+    let mut out = std::io::stdout().lock();
     let tokenizer = load_tokenizer(model_dir)?;
     let (files, mut skipped) = walk(folder);
     let (mut prepared, mut chunks) = (0, 0);
     for file in &files {
         match prepare(&file.path, file.format, &tokenizer, config) {
             Ok(passages) => {
-                println!("{} ({} chunks)", file.path.display(), passages.len());
+                writeln!(out, "{} ({} chunks)", file.path.display(), passages.len())?;
                 for (ord, p) in passages.iter().enumerate() {
                     let page = p.page.map_or(String::new(), |n| format!(" p.{n}"));
-                    println!(
+                    writeln!(
+                        out,
                         "  #{ord} [{}..{}]{page} {}",
                         p.char_start,
                         p.char_end,
                         snippet(&p.text, 100)
-                    );
+                    )?;
                 }
                 prepared += 1;
                 chunks += passages.len();
@@ -245,12 +253,13 @@ fn dry_run_index(folder: &Path, model_dir: &Path, config: ChunkConfig) -> Result
         }
     }
     for s in &skipped {
-        println!("skipped {}: {}", s.path.display(), s.reason);
+        writeln!(out, "skipped {}: {}", s.path.display(), s.reason)?;
     }
-    println!(
+    writeln!(
+        out,
         "{prepared} file(s), {chunks} chunk(s), {} skipped",
         skipped.len()
-    );
+    )?;
     Ok(())
 }
 
