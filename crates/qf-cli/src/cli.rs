@@ -5,7 +5,7 @@ use anyhow::{Context, Result, bail};
 use clap::{Args, Parser, Subcommand};
 use qf_core::chunk::{ChunkConfig, ModelTokenizer};
 use qf_core::embed::Embedder;
-use qf_core::format::snippet;
+use qf_core::format::{snippet, wrap};
 use qf_core::index::{build_index, check_index_dir, index_meta};
 use qf_core::ingest::{Skipped, walk};
 use qf_core::prepare::prepare;
@@ -177,6 +177,11 @@ fn index(folder: &Path, index_dir: &Path, model_dir: &Path, config: ChunkConfig)
     Ok(())
 }
 
+/// Lines under a search result line up after its rank and score.
+const RESULT_INDENT: &str = "           ";
+/// Width of the wrapped passage under a result.
+const RESULT_WIDTH: usize = 72;
+
 fn search(
     query: &str,
     k: usize,
@@ -196,29 +201,37 @@ fn search(
         let doc = store
             .document(chunk.doc_id)?
             .with_context(|| format!("document {} missing from the index", chunk.doc_id))?;
-        let page = chunk.page.map_or(String::new(), |n| format!(" p.{n}"));
-        writeln!(
-            out,
-            "{:>2}. {:.4}  {}{page} [{}..{}]\n    {}",
-            rank + 1,
-            hit.score,
-            doc.path.display(),
+        // File name first, where the eye looks; then where it is, and the
+        // passage wrapped under it.
+        let name = doc.path.file_name().unwrap_or(doc.path.as_os_str());
+        let folder = doc.path.parent().unwrap_or(Path::new(""));
+        let mut place = format!(
+            "{} · characters {}–{}",
+            folder.display(),
             chunk.char_start,
-            chunk.char_end,
-            snippet(&chunk.text, 240)
-        )?;
+            chunk.char_end
+        );
+        if let Some(page) = chunk.page {
+            place.push_str(&format!(" · page {page}"));
+        }
+        writeln!(out, "{:>2}. {:.3}  {}", rank + 1, hit.score, name.display())?;
+        writeln!(out, "{RESULT_INDENT}{place}")?;
+        for line in wrap(&snippet(&chunk.text, 280), RESULT_WIDTH) {
+            writeln!(out, "{RESULT_INDENT}{line}")?;
+        }
+        writeln!(out)?;
     }
-    writeln!(
-        out,
+    let mut summary = format!(
         "{} result(s) in {:.1} ms (encode {:.1} ms, scan {:.1} ms)",
         result.hits.len(),
         (result.encode_time + result.scan_time).as_secs_f64() * 1e3,
         result.encode_time.as_secs_f64() * 1e3,
         result.scan_time.as_secs_f64() * 1e3,
-    )?;
+    );
     if let Some(line) = crate::memory::peak_line() {
-        writeln!(out, "{line}")?;
+        summary.push_str(&format!(" · {line}"));
     }
+    writeln!(out, "{summary}")?;
     Ok(())
 }
 
