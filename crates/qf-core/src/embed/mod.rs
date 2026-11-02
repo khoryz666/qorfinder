@@ -1,10 +1,12 @@
 //! Sentence embeddings with all-MiniLM-L6-v2, run on the CPU with candle.
 
+mod mpnet;
+
 use std::path::Path;
 
 use candle_core::{D, Device, Tensor};
 use candle_nn::VarBuilder;
-use candle_transformers::models::bert::{BertModel, Config, DTYPE};
+use candle_transformers::models::bert::{self, BertModel, DTYPE};
 use tokenizers::{PaddingParams, Tokenizer, TruncationParams};
 
 use crate::chunk::TokenizeError;
@@ -36,9 +38,23 @@ pub enum EmbedError {
     Model(#[from] candle_core::Error),
 }
 
+/// The transformer, chosen by `model_type` in `config.json`.
+enum Encoder {
+    Bert(BertModel),
+    MPNet(mpnet::MPNetModel),
+}
+
+/// The fields of `config.json` read before the architecture is known.
+#[derive(serde::Deserialize)]
+struct ModelType {
+    model_type: String,
+    #[serde(default)]
+    pad_token_id: u32,
+}
+
 /// A loaded embedding model and its tokenizer.
 pub struct Embedder {
-    model: BertModel,
+    model: Encoder,
     tokenizer: Tokenizer,
     device: Device,
     dim: usize,
@@ -57,17 +73,25 @@ impl Embedder {
                 source,
             })
         };
-        let config: Config = serde_json::from_slice(&read("config.json")?)?;
+        let config = read("config.json")?;
+        let model_type: ModelType = serde_json::from_slice(&config)?;
 
         let mut tokenizer =
             Tokenizer::from_bytes(read("tokenizer.json")?).map_err(EmbedError::Tokenizer)?;
+        // Pad with the model's own padding token (MPNet's is not id 0).
+        let pad_id = model_type.pad_token_id;
+        let pad_token = tokenizer.id_to_token(pad_id).unwrap_or_default();
         tokenizer
             .with_truncation(Some(TruncationParams {
                 max_length: MAX_SEQ_LEN,
                 ..Default::default()
             }))
             .map_err(EmbedError::Tokenizer)?
-            .with_padding(Some(PaddingParams::default()));
+            .with_padding(Some(PaddingParams {
+                pad_id,
+                pad_token,
+                ..Default::default()
+            }));
 
         let device = Device::Cpu;
         let weights = model_dir.join("model.safetensors");
@@ -80,7 +104,17 @@ impl Embedder {
         // SAFETY: the weights file is memory-mapped read-only; it must not be
         // modified while the model is loaded, which nothing in QorFinder does.
         let vb = unsafe { VarBuilder::from_mmaped_safetensors(&[&weights], DTYPE, &device)? };
-        let model = BertModel::load(vb, &config)?;
+        let (model, dim) = if model_type.model_type == "mpnet" {
+            let config: mpnet::Config = serde_json::from_slice(&config)?;
+            let model = mpnet::MPNetModel::load(vb, &config)?;
+            (Encoder::MPNet(model), config.hidden_size)
+        } else {
+            let config: bert::Config = serde_json::from_slice(&config)?;
+            (
+                Encoder::Bert(BertModel::load(vb, &config)?),
+                config.hidden_size,
+            )
+        };
         let weights_sha256 = crate::ingest::hash_file(&weights)
             .map_err(|source| EmbedError::Io {
                 path: weights.display().to_string(),
@@ -93,7 +127,7 @@ impl Embedder {
             model,
             tokenizer,
             device,
-            dim: config.hidden_size,
+            dim,
             weights_sha256,
         })
     }
@@ -111,7 +145,7 @@ impl Embedder {
 
     /// Embed one batch of texts (up to [`BATCH_SIZE`] at a time is best).
     /// Each text is tokenised and truncated to [`MAX_SEQ_LEN`] tokens, the
-    /// batch is padded to its longest text, run through BERT, and every
+    /// batch is padded to its longest text, run through the encoder, and every
     /// text's token vectors are mean-pooled over its real (unpadded) tokens
     /// and scaled to unit length, as sentence-transformers does for this
     /// model. Unit length makes the dot product equal cosine similarity.
@@ -135,7 +169,10 @@ impl Embedder {
         let mask = stack(encodings.iter().map(|e| e.get_attention_mask()).collect())?;
 
         // [batch, tokens, dim]
-        let hidden = self.model.forward(&ids, &type_ids, Some(&mask))?;
+        let hidden = match &self.model {
+            Encoder::Bert(model) => model.forward(&ids, &type_ids, Some(&mask))?,
+            Encoder::MPNet(model) => model.forward(&ids, &mask)?,
+        };
         let mask = mask.to_dtype(hidden.dtype())?.unsqueeze(D::Minus1)?;
         let summed = hidden.broadcast_mul(&mask)?.sum(1)?;
         let counts = mask.sum(1)?;
