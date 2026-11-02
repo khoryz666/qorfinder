@@ -1,0 +1,35 @@
+Embedding model sweep over the 34 frozen queries (30 CUAD contracts, seed 2026, chunks 200/40, RRF kappa = 5)
+Reproduce at 6992466 (fetch each model first with scripts/fetch_model.py --model ID):
+  qorfinder --model ID --index-dir data/eval-NAME eval --reindex --out results/model-sweep/NAME
+  python3 scripts/score.py results/model-sweep/NAME
+  qorfinder --model ID --index-dir data/eval-NAME eval --timing --out results/model-sweep/NAME-timing
+with NAME/ID minilm/sentence-transformers/all-MiniLM-L6-v2, mpnet/sentence-transformers/all-mpnet-base-v2,
+bge/BAAI/bge-base-en-v1.5, e5/intfloat/e5-base-v2. Rerunning at 6992466 gave byte-identical qrels and runs
+for all four models; the minilm runs are also byte-identical to results/2026-11-02-kappa-sweep/.
+BM25 is identical for every model (BGE and E5 share MiniLM's vocabulary; MPNet's differs but gives the same
+1686 chunks): matched 0.3227, paraphrased 0.1055, all 0.2141 nDCG@10.
+Every model's Rust embeddings match Python sentence-transformers at cosine 1.000000 on chunks and queries
+(crates/qf-core/tests/fixtures/reference/).
+
+model               sem nDCG@10 m/p/all       sem MRR@10 m/p/all        hybrid all  matched gap to BM25
+all-MiniLM-L6-v2    0.2068 0.1306 0.1687   0.3515 0.2059 0.2787   0.2351      0.1160  not met
+all-mpnet-base-v2   0.2709 0.1932 0.2320   0.4902 0.2584 0.3743   0.3012      0.0518  not met
+bge-base-en-v1.5    0.2121 0.1338 0.1730   0.3613 0.2039 0.2826   0.2463      0.1106  not met
+e5-base-v2          0.2060 0.1349 0.1705   0.2990 0.1985 0.2488   0.2481      0.1167  not met
+
+Leave-one-category-out cross-validation over the four models (scripts/cv_select.py):
+CV semantic_ndcg@10 matched 0.2709, paraphrased 0.1932, all 0.2320; chosen: mpnet in 17 of 17 folds
+CV hybrid_ndcg@10   matched 0.3746, paraphrased 0.2278, all 0.3012; chosen: mpnet in 17 of 17 folds
+CV semantic_mrr@10  matched 0.4902, paraphrased 0.2584, all 0.3743; chosen: mpnet in 17 of 17 folds
+
+Efficiency on the dev machine (Ryzen 7 5700U, 16 GB), 30-contract eval index (1686 chunks), release build.
+Eval peak RSS and wall time from /usr/bin/time -v around eval --reindex; query timing from eval --timing (34 queries x 5):
+model               dim  index   eval peak RSS  query median / p95 (encode)       timing peak
+all-MiniLM-L6-v2    384  4.0 MB  1.42 GB        36.4 / 40.3 ms  (35.8 ms)          188 MB
+all-mpnet-base-v2   768  6.4 MB  2.51 GB        122.4 / 136.0 ms (121.3 ms)        848 MB
+bge-base-en-v1.5    768  6.4 MB  2.11 GB        139.0 / 159.1 ms (137.9 ms)        847 MB
+e5-base-v2          768  6.4 MB  2.09 GB        124.7 / 141.7 ms (123.6 ms)        847 MB
+Eval-index wall time (index 30 contracts + all queries): MiniLM 1:10, MPNet 5:45, BGE 6:08, E5 6:26.
+Not measured: the 510-contract full index for the base models (MiniLM took 32-67 min there; a base model
+would take several hours). The scan grows with chunks x dimension: 12.5 ms over 39,307 MiniLM chunks, so
+about 25 ms for a 768-dim model (an estimate), keeping a query well under 1 s.

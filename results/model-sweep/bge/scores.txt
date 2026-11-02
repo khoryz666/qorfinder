@@ -1,0 +1,30 @@
+matched queries (17)
+  method          ndcg@10       mrr@10  r-precision
+  bm25             0.3227       0.4289       0.2800
+  semantic         0.2121       0.3613       0.1617
+  hybrid           0.3211       0.4231       0.2371
+  Wilcoxon signed-rank on nDCG@10, two-sided p:
+    semantic vs bm25: 0.1730 (13 differing queries)
+    hybrid vs bm25: 0.8068 (13 differing queries)
+    hybrid vs semantic: 0.1330 (13 differing queries)
+
+paraphrased queries (17)
+  method          ndcg@10       mrr@10  r-precision
+  bm25             0.1055       0.1353       0.0784
+  semantic         0.1338       0.2039       0.0779
+  hybrid           0.1714       0.2412       0.1017
+  Wilcoxon signed-rank on nDCG@10, two-sided p:
+    semantic vs bm25: 0.3743 (9 differing queries)
+    hybrid vs bm25: 0.1763 (7 differing queries)
+    hybrid vs semantic: 0.6744 (8 differing queries)
+
+all queries (34)
+  method          ndcg@10       mrr@10  r-precision
+  bm25             0.2141       0.2821       0.1792
+  semantic         0.1730       0.2826       0.1198
+  hybrid           0.2463       0.3321       0.1694
+  Wilcoxon signed-rank on nDCG@10, two-sided p:
+    semantic vs bm25: 0.7210 (22 differing queries)
+    hybrid vs bm25: 0.2322 (20 differing queries)
+    hybrid vs semantic: 0.1924 (21 differing queries)
+
