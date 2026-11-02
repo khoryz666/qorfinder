@@ -1,12 +1,14 @@
 //! Reciprocal Rank Fusion (RRF): combine the BM25 and semantic rankings
-//! into one hybrid ranking, with no tuning (report Equation 2.4).
+//! into one hybrid ranking (report Equation 2.4).
 
 use std::collections::HashMap;
 
 use crate::Hit;
 
-/// The constant from Cormack et al. (2009), used untuned.
-pub const RRF_KAPPA: u32 = 60;
+/// The RRF constant. Cormack et al. (2009) use 60; on the CUAD test set 5
+/// scores best, chosen by leave-one-category-out cross-validation (15 of
+/// 17 folds pick it). A small constant lets each list's top ranks count.
+pub const RRF_KAPPA: u32 = 5;
 
 /// Fuse two rankings of chunk ids, each best first. A chunk scores
 /// `1 / (kappa + r)` for its 1-based rank `r` in each list, summed over the

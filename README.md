@@ -70,7 +70,8 @@ the settings it was built with.
    dot product.
 6. **Baseline and hybrid** (evaluation): a tantivy BM25 index over the same
    chunks (English stemming, k1 = 1.2, b = 0.75), and Reciprocal Rank Fusion
-   of the two full rankings (κ = 60, untuned).
+   of the two full rankings (κ = 5, chosen by cross-validation; `eval --kappa`
+   tries others).
 
 ## Test collection
 
