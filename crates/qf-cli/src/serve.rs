@@ -15,17 +15,17 @@ use axum::extract::{Query, Request, State};
 use axum::http::{StatusCode, header};
 use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
-use axum::routing::get;
+use axum::routing::{get, post};
 use axum::{Json, Router};
-use qf_core::chunk::ChunkConfig;
+use qf_core::chunk::{ChunkConfig, ModelTokenizer};
 use qf_core::embed::Embedder;
-use qf_core::index::index_meta;
+use qf_core::index::{Progress, Stage, build_index, check_index_dir, index_meta};
 use qf_core::search::Searcher;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tower_http::services::ServeDir;
 
-use crate::cli::load_embedder;
+use crate::cli::{load_embedder, load_tokenizer};
 
 /// Header the UI sends the token in.
 pub const TOKEN_HEADER: &str = "x-qorfinder-token";
@@ -41,10 +41,50 @@ pub struct App {
     pub index_dir: PathBuf,
     pub config: ChunkConfig,
     pub embedder: &'static Embedder,
+    pub tokenizer: ModelTokenizer,
     /// `None` while there is no usable index.
     pub searcher: Mutex<Option<Searcher<'static>>>,
     /// Why there is no usable index, shown in the UI.
     pub problem: Mutex<Option<String>>,
+    /// The current or last indexing run.
+    pub job: Mutex<Job>,
+}
+
+/// An indexing run, as the UI shows it.
+#[derive(Default, Clone, Serialize)]
+pub struct Job {
+    running: bool,
+    folder: Option<String>,
+    /// `reading` (files) or `embedding` (chunks).
+    stage: Option<&'static str>,
+    done: usize,
+    total: usize,
+    elapsed_s: f64,
+    /// How the last run ended: a summary or an error.
+    message: Option<String>,
+    failed: bool,
+    skipped: Vec<String>,
+    #[serde(skip)]
+    started: Option<std::time::Instant>,
+}
+
+/// Indexing progress written into the job for the UI to poll.
+struct JobProgress<'a>(&'a Mutex<Job>);
+
+impl Progress for JobProgress<'_> {
+    fn start(&self, stage: Stage, total: usize) {
+        let mut job = self.0.lock().unwrap();
+        job.stage = Some(match stage {
+            Stage::Preparing => "reading",
+            Stage::Embedding => "embedding",
+        });
+        job.done = 0;
+        job.total = total;
+    }
+
+    fn advance(&self, done: usize) {
+        self.0.lock().unwrap().done += done;
+    }
 }
 
 impl App {
@@ -68,8 +108,10 @@ pub fn run(port: u16, index_dir: &Path, model_dir: &Path, config: ChunkConfig) -
         index_dir: index_dir.to_path_buf(),
         config,
         embedder,
+        tokenizer: load_tokenizer(model_dir)?,
         searcher: Mutex::new(None),
         problem: Mutex::new(None),
+        job: Mutex::new(Job::default()),
     });
     app.open_searcher();
     let ui_dir = ui_dir().context("cannot find the built UI (run `npm run build` in ui/)")?;
@@ -100,6 +142,10 @@ pub fn router(app: Arc<App>, port: u16, ui_dir: &Path) -> Router {
     let api = Router::new()
         .route("/status", get(status))
         .route("/search", get(search))
+        .route("/index", post(start_index))
+        .route("/index/status", get(index_status))
+        .route("/folders/pick", post(pick_folder))
+        .route("/open", post(open_file))
         .with_state(app);
     guard(api, token, port, ui_dir)
 }
@@ -280,6 +326,146 @@ async fn search(State(app): State<Arc<App>>, Query(params): Query<SearchParams>)
         Ok(Ok(body)) => Json(body).into_response(),
         Ok(Err((status, message))) => error(status, message),
         Err(err) => error(StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
+    }
+}
+
+#[derive(Deserialize)]
+struct IndexRequest {
+    /// The folder to index; missing means rebuild from the folder the
+    /// current index was built from (FR8).
+    folder: Option<String>,
+}
+
+/// Start indexing in the background. The open index is closed first: on
+/// Windows the new index cannot be swapped in while its files are open.
+async fn start_index(State(app): State<Arc<App>>, Json(req): Json<IndexRequest>) -> Response {
+    let folder = match req.folder.filter(|f| !f.trim().is_empty()) {
+        Some(folder) => PathBuf::from(folder.trim()),
+        None => {
+            let source = app
+                .searcher
+                .lock()
+                .unwrap()
+                .as_ref()
+                .and_then(|s| s.store().source_folder().ok().flatten());
+            match source {
+                Some(folder) => folder,
+                None => return error(StatusCode::BAD_REQUEST, "choose a folder to index"),
+            }
+        }
+    };
+    if !folder.is_dir() {
+        return error(
+            StatusCode::BAD_REQUEST,
+            format!("{} is not a folder", folder.display()),
+        );
+    }
+    if let Err(err) = check_index_dir(&folder, &app.index_dir) {
+        return error(StatusCode::BAD_REQUEST, err.to_string());
+    }
+    {
+        let mut job = app.job.lock().unwrap();
+        if job.running {
+            return error(StatusCode::CONFLICT, "indexing is already running");
+        }
+        *job = Job {
+            running: true,
+            folder: Some(folder.display().to_string()),
+            started: Some(std::time::Instant::now()),
+            ..Job::default()
+        };
+    }
+    *app.searcher.lock().unwrap() = None;
+    tokio::task::spawn_blocking(move || {
+        let report = build_index(
+            &folder,
+            &app.index_dir,
+            app.embedder,
+            &app.tokenizer,
+            app.config,
+            &JobProgress(&app.job),
+        );
+        app.open_searcher();
+        let mut job = app.job.lock().unwrap();
+        job.running = false;
+        job.stage = None;
+        match report {
+            Ok(report) => {
+                job.message = Some(format!(
+                    "Indexed {} document(s) into {} passage(s) in {:.0} s.",
+                    report.documents,
+                    report.chunks,
+                    report.total_time.as_secs_f64()
+                ));
+                job.skipped = report
+                    .skipped
+                    .iter()
+                    .map(|s| format!("{}: {}", s.path.display(), s.reason))
+                    .collect();
+            }
+            Err(err) => {
+                job.failed = true;
+                job.message = Some(err.to_string());
+            }
+        }
+    });
+    StatusCode::ACCEPTED.into_response()
+}
+
+async fn index_status(State(app): State<Arc<App>>) -> Response {
+    let mut job = app.job.lock().unwrap().clone();
+    if job.running {
+        job.elapsed_s = job.started.map_or(0.0, |t| t.elapsed().as_secs_f64());
+    }
+    Json(job).into_response()
+}
+
+/// Show the system's folder dialog. A browser cannot hand the server a
+/// real path, so the server asks instead.
+async fn pick_folder() -> Response {
+    let picked = tokio::task::spawn_blocking(|| {
+        rfd::FileDialog::new()
+            .set_title("Choose a folder to index")
+            .pick_folder()
+    })
+    .await;
+    match picked {
+        Ok(folder) => {
+            Json(json!({ "folder": folder.map(|f| f.display().to_string()) })).into_response()
+        }
+        Err(err) => error(StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
+    }
+}
+
+#[derive(Deserialize)]
+struct OpenRequest {
+    chunk_id: u32,
+}
+
+/// Open the file a result came from in its default app. Only files in the
+/// index can be opened, by chunk id, never by a path from the request.
+async fn open_file(State(app): State<Arc<App>>, Json(req): Json<OpenRequest>) -> Response {
+    let path = {
+        let slot = app.searcher.lock().unwrap();
+        let Some(searcher) = &*slot else {
+            return error(StatusCode::CONFLICT, "no index is open");
+        };
+        let store = searcher.store();
+        match store
+            .chunk(req.chunk_id)
+            .and_then(|c| c.map(|c| store.document(c.doc_id)).transpose())
+        {
+            Ok(Some(Some(doc))) => doc.path,
+            Ok(_) => return error(StatusCode::NOT_FOUND, "no such result"),
+            Err(err) => return error(StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
+        }
+    };
+    match opener::open(&path) {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        Err(err) => error(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            format!("cannot open {}: {err}", path.display()),
+        ),
     }
 }
 
