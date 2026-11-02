@@ -102,6 +102,8 @@ qorfinder --index-dir <index of data/cuad/txt> eval --timing   # latency
 
 `score.py` writes `scores.txt` and `per_query.csv` beside the run files;
 `scripts/test_score.py` checks it against a hand-worked example.
+`scripts/cv_select.py` picks a setting (such as `--kappa`) from several scored
+runs by leave-one-category-out cross-validation.
 
 ## Develop
 
