@@ -1,0 +1,36 @@
+Chunk size sweep over the 34 frozen queries (RRF kappa = 5, 4f04c13)
+Each setting re-indexes the 30 sampled contracts and re-judges relevance at span level.
+
+max/overlap  chunks  relevant  method    matched  paraphrased  all   (nDCG@10)
+128/16         2545       188  bm25        0.2001   0.0493   0.1247
+128/16         2545       188  semantic    0.1514   0.0852   0.1183
+128/16         2545       188  hybrid      0.2028   0.0732   0.1380
+160/32         2094       166  bm25        0.2831   0.0702   0.1766
+160/32         2094       166  semantic    0.1942   0.1021   0.1482
+160/32         2094       166  hybrid      0.2683   0.1067   0.1875
+200/20         1626       150  bm25        0.3225   0.1036   0.2131
+200/20         1626       150  semantic    0.2284   0.1131   0.1708
+200/20         1626       150  hybrid      0.3229   0.1297   0.2263
+200/40         1686       152  bm25        0.3227   0.1055   0.2141
+200/40         1686       152  semantic    0.2068   0.1306   0.1687
+200/40         1686       152  hybrid      0.3185   0.1517   0.2351
+256/40         1294       128  bm25        0.3285   0.0935   0.2110
+256/40         1294       128  semantic    0.2320   0.0919   0.1620
+256/40         1294       128  hybrid      0.3294   0.1218   0.2256
+300/60         1123       132  bm25        0.3365   0.1311   0.2338
+300/60         1123       132  semantic    0.2263   0.1468   0.1866
+300/60         1123       132  hybrid      0.3010   0.1803   0.2407
+
+Leave-one-category-out cross-validation over the six settings (scripts/cv_select.py):
+CV bm25_ndcg@10 matched      0.2957
+CV bm25_ndcg@10 paraphrased  0.1311
+CV bm25_ndcg@10 all          0.2134
+chosen: 300/60 in 16 of 17 folds, 200/40 in 1 of 17 folds
+CV semantic_ndcg@10 matched      0.2263
+CV semantic_ndcg@10 paraphrased  0.1468
+CV semantic_ndcg@10 all          0.1866
+chosen: 300/60 in 17 of 17 folds
+CV hybrid_ndcg@10 matched      0.2460
+CV hybrid_ndcg@10 paraphrased  0.1348
+CV hybrid_ndcg@10 all          0.1904
+chosen: 300/60 in 12 of 17 folds, 200/40 in 4 of 17 folds, 256/40 in 1 of 17 folds
