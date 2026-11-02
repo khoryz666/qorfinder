@@ -45,11 +45,36 @@ instead of embedding anything, which is useful for checking extraction.
 | `serve [--port 0]` | Open the browser UI: choose a folder, watch indexing, search and open files. Listens on 127.0.0.1 only, and every API call needs the random token in the address it opens. |
 
 Global options: `--index-dir` (or `QORFINDER_INDEX_DIR`; default
-`qorfinder/index` in the user's local data folder) and `--model-dir` (or
-`QORFINDER_MODEL_DIR`; default `models/all-MiniLM-L6-v2` next to the
-executable, or in the current folder). `--max-tokens`
+`qorfinder/index` in the user's local data folder), `--model` (or
+`QORFINDER_MODEL`; a Hugging Face id from the table below, default
+`sentence-transformers/all-MiniLM-L6-v2`) and `--model-dir` (or
+`QORFINDER_MODEL_DIR`; default `models/<name>`, the last part of the model
+id, next to the executable or in the current folder). `--max-tokens`
 (200) and `--overlap` (40) set the chunk size; an index is only searched with
-the settings it was built with.
+the model and settings it was built with.
+
+## Models
+
+Each supported model is one entry in `crates/qf-core/src/embed/models.rs`
+(architecture, vector size, input length, pooling and prefixes) and one in
+`scripts/fetch_model.py` (pinned revision and SHA-256 of every file).
+
+| `--model` | Architecture | Size | Pooling | Query / passage prefix |
+|---|---|---|---|---|
+| `sentence-transformers/all-MiniLM-L6-v2` (default) | BERT, 6 layers | 384 | mean | none |
+| `sentence-transformers/all-mpnet-base-v2` | MPNet, 12 layers | 768 | mean | none |
+| `BAAI/bge-base-en-v1.5` | BERT, 12 layers | 768 | first token | `Represent this sentence for searching relevant passages: ` / none |
+| `intfloat/e5-base-v2` | BERT, 12 layers | 768 | mean | `query: ` / `passage: ` |
+
+```bash
+python3 scripts/fetch_model.py --model intfloat/e5-base-v2
+qorfinder --model intfloat/e5-base-v2 --index-dir data/eval-e5 eval --out results/e5
+```
+
+The four were compared on the frozen test set in `results/model-sweep/`
+(`sweep.txt`). The default stays all-MiniLM-L6-v2: all-mpnet-base-v2 scores
+best, but no model brings semantic search within 0.05 nDCG@10 of BM25 on the
+matched queries, and the base models are about 3.4× slower per query.
 
 ## How it works
 
@@ -62,8 +87,10 @@ the settings it was built with.
    `(a)`), pack them up to 200 model tokens, and cut over-long paragraphs
    with a 40-token overlapping window. Every chunk keeps its character range
    in the original text.
-3. **Embed**: all-MiniLM-L6-v2 on candle, mean-pooled and L2-normalised,
-   matching Python sentence-transformers (cosine > 0.99, checked by a test).
+3. **Embed**: the chosen model (all-MiniLM-L6-v2 by default) on candle,
+   pooled as the model says and L2-normalised, with its query and passage
+   prefixes, matching Python sentence-transformers for every model on chunks
+   and queries (cosine > 0.99, checked by a test).
 4. **Store**: documents, chunks and the build settings in SQLite; vectors
    in one flat little-endian `vectors.f32`.
 5. **Search**: embed the query the same way and take the exact top-k by
@@ -116,10 +143,12 @@ cargo test -- --include-ignored   # also the tests that load models/
 Every tool comes from the locked flake, so any machine with Nix (flakes
 enabled) gets the same environment with no other setup. Regenerating the
 reference embeddings needs sentence-transformers and PyTorch, which live in a
-separate shell:
+separate shell. It writes one file per model to
+`crates/qf-core/tests/fixtures/reference/`; the test checks each fetched model
+against it and skips the others:
 
 ```bash
-nix develop .#reference --command python3 scripts/reference_embeddings.py
+nix develop .#reference --command python3 scripts/reference_embeddings.py [--model ID]
 ```
 
 Layout:

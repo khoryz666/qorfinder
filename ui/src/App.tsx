@@ -308,7 +308,8 @@ function AboutView({ status }: { status: Status | null }) {
         <li>Reads PDF (with a text layer), Word (.docx) and plain text files.</li>
         <li>
           Splits each document into passages along paragraphs and numbered clauses, and turns
-          each into a vector with the all-MiniLM-L6-v2 language model.
+          each into a vector with a local language model (all-MiniLM-L6-v2 unless another is
+          chosen with --model).
         </li>
         <li>Scanned PDFs without a text layer are skipped and listed.</li>
       </ul>
