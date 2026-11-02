@@ -6,6 +6,7 @@ use clap::{Args, Parser, Subcommand};
 use qf_core::chunk::{ChunkConfig, ModelTokenizer};
 use qf_core::embed::Embedder;
 use qf_core::format::{snippet, wrap};
+use qf_core::fusion::RRF_KAPPA;
 use qf_core::index::{build_index, check_index_dir, index_meta};
 use qf_core::ingest::{Skipped, walk};
 use qf_core::prepare::prepare;
@@ -88,6 +89,10 @@ enum Command {
         #[arg(long)]
         timing: bool,
 
+        /// RRF constant for the hybrid run
+        #[arg(long, default_value_t = RRF_KAPPA)]
+        kappa: u32,
+
         #[command(flatten)]
         chunking: ChunkArgs,
     },
@@ -153,6 +158,7 @@ pub fn run() -> Result<()> {
             out,
             reindex,
             timing,
+            kappa,
             chunking,
         } => {
             let config = chunking.config()?;
@@ -165,7 +171,7 @@ pub fn run() -> Result<()> {
                 .index_dir
                 .unwrap_or_else(|| PathBuf::from(EVAL_INDEX_DIR));
             crate::eval::effectiveness(
-                &testset, &docs, &out, &index_dir, &model_dir, config, reindex,
+                &testset, &docs, &out, &index_dir, &model_dir, config, reindex, kappa,
             )
         }
         Command::Serve { port, chunking } => {

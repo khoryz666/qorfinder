@@ -11,7 +11,7 @@ use anyhow::{Context, Result};
 use qf_core::bm25::Bm25;
 use qf_core::chunk::ChunkConfig;
 use qf_core::eval::{judge, read_queries, read_spans, write_qrels, write_run};
-use qf_core::fusion::{RRF_KAPPA, reciprocal_rank_fusion};
+use qf_core::fusion::reciprocal_rank_fusion;
 use qf_core::index::{build_index, check_index_dir, index_meta};
 use qf_core::search::Searcher;
 use qf_core::store::Store;
@@ -41,6 +41,8 @@ struct Timed<'a> {
 /// Index `docs` into `index_dir` (unless an index of the same folder with
 /// the same settings is already there), judge every chunk against the
 /// spans, and write `qrels.trec` and one run file per method to `out`.
+/// The hybrid run fuses with RRF constant `kappa`.
+#[allow(clippy::too_many_arguments)]
 pub fn effectiveness(
     testset: &Path,
     docs: &Path,
@@ -49,6 +51,7 @@ pub fn effectiveness(
     model_dir: &Path,
     config: ChunkConfig,
     reindex: bool,
+    kappa: u32,
 ) -> Result<()> {
     let mut stdout = std::io::stdout().lock();
     let queries = read_queries(&testset.join("queries.jsonl"))?;
@@ -102,7 +105,7 @@ pub fn effectiveness(
     for query in &queries {
         let lexical = bm25.search(&query.text, all)?;
         let semantic = searcher.search(&query.text, all)?.hits;
-        let hybrid = reciprocal_rank_fusion(&ids(&lexical), &ids(&semantic), all, RRF_KAPPA);
+        let hybrid = reciprocal_rank_fusion(&ids(&lexical), &ids(&semantic), all, kappa);
         for ((_, run), mut hits) in runs.iter_mut().zip([lexical, semantic, hybrid]) {
             hits.truncate(RUN_DEPTH);
             run.push((query.id.clone(), hits));
