@@ -91,6 +91,15 @@ enum Command {
         #[command(flatten)]
         chunking: ChunkArgs,
     },
+    /// Open the search page in the browser, served on 127.0.0.1 only
+    Serve {
+        /// Port to listen on; 0 picks a free one
+        #[arg(long, default_value_t = 0)]
+        port: u16,
+
+        #[command(flatten)]
+        chunking: ChunkArgs,
+    },
 }
 
 /// Chunk settings. An index can only be searched with the settings it was
@@ -158,6 +167,10 @@ pub fn run() -> Result<()> {
             crate::eval::effectiveness(
                 &testset, &docs, &out, &index_dir, &model_dir, config, reindex,
             )
+        }
+        Command::Serve { port, chunking } => {
+            let index_dir = cli.index_dir.unwrap_or_else(default_index_dir);
+            crate::serve::run(port, &index_dir, &model_dir, chunking.config()?)
         }
     }
 }

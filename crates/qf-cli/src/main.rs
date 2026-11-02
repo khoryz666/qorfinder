@@ -2,6 +2,7 @@ mod cli;
 mod eval;
 mod memory;
 mod progress;
+mod serve;
 
 fn main() {
     if let Err(err) = cli::run() {
