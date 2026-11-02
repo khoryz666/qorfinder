@@ -163,6 +163,9 @@ pub fn build_index(
     progress: &impl Progress,
 ) -> Result<IndexReport, IndexError> {
     check_index_dir(folder, index_dir)?;
+    // Absolute, so stored document paths and the recorded source folder
+    // work whatever folder a later search or rebuild starts from.
+    let folder = &std::path::absolute(folder).map_err(StoreError::from)?;
     let started = Instant::now();
     let (files, mut skipped) = walk_except(folder, index_folders(index_dir));
     progress.start(Stage::Preparing, files.len());
@@ -251,9 +254,7 @@ pub fn build_index(
     store.insert_chunks(&chunks)?;
     // Written last: an index whose run was cut short has no meta and is
     // refused instead of being searched half-built.
-    // Absolute, so a rebuild works whatever folder it is started from.
-    let source = std::path::absolute(folder).map_err(StoreError::from)?;
-    store.write_source_folder(&source)?;
+    store.write_source_folder(folder)?;
     store.write_meta(&index_meta(embedder, config))?;
     // Close the database before the folder is renamed (Windows refuses to
     // move open files).
