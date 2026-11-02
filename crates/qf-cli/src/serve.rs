@@ -271,10 +271,12 @@ async fn search(State(app): State<Arc<App>>, Query(params): Query<SearchParams>)
     let result = tokio::task::spawn_blocking(move || {
         let slot = app.searcher.lock().unwrap();
         let Some(searcher) = &*slot else {
-            return Err((
-                StatusCode::CONFLICT,
-                "no index yet: choose a folder to index".to_string(),
-            ));
+            let message = if app.job.lock().unwrap().running {
+                "indexing is in progress; search again when it is done"
+            } else {
+                "no index yet: choose a folder to index"
+            };
+            return Err((StatusCode::CONFLICT, message.to_string()));
         };
         let result = searcher
             .search(&query, k)
