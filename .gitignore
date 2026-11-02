@@ -13,3 +13,4 @@ result
 result-*
 __pycache__/
 .venv/
+THIRD_PARTY_LICENSES.html

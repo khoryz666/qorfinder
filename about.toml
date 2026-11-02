@@ -1,0 +1,7 @@
+# cargo about: the licences of the Rust libraries built into the release
+# executables, collected into THIRD_PARTY_LICENSES.html for the zips.
+# Where a crate offers a choice, the first accepted licence is used.
+accepted = ["MIT", "Apache-2.0", "BSD-3-Clause", "Unicode-3.0", "Zlib", "MPL-2.0"]
+targets = ["x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc"]
+ignore-build-dependencies = true
+ignore-dev-dependencies = true

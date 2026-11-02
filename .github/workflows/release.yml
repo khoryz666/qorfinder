@@ -37,6 +37,14 @@ jobs:
         run: npm ci && npm run build
         working-directory: ui
 
+      - name: Collect the Rust libraries' licences
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-about
+
+      - name: Write THIRD_PARTY_LICENSES.html
+        run: cargo about generate about.hbs -o THIRD_PARTY_LICENSES.html
+
       # The executable looks for models/all-MiniLM-L6-v2 and the built UI
       # (ui/) next to itself, so the zip unpacks into a folder that runs as
       # it is.
@@ -44,7 +52,7 @@ jobs:
         run: |
           pkg=dist/qorfinder
           mkdir -p "$pkg/models"
-          cp target/release/qorfinder LICENSE "$pkg/"
+          cp target/release/qorfinder LICENSE THIRD_PARTY_LICENSES.html "$pkg/"
           cp -r models/all-MiniLM-L6-v2 "$pkg/models/"
           cp -r ui/dist "$pkg/ui"
           cp licenses/all-MiniLM-L6-v2.txt "$pkg/models/all-MiniLM-L6-v2/LICENSE"
@@ -79,11 +87,19 @@ jobs:
         run: npm ci && npm run build
         working-directory: ui
 
+      - name: Collect the Rust libraries' licences
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-about
+
+      - name: Write THIRD_PARTY_LICENSES.html
+        run: cargo about generate about.hbs -o THIRD_PARTY_LICENSES.html
+
       - name: Package
         run: |
           $pkg = "dist/qorfinder"
           New-Item -ItemType Directory -Force "$pkg/models" | Out-Null
-          Copy-Item target/release/qorfinder.exe, LICENSE "$pkg/"
+          Copy-Item target/release/qorfinder.exe, LICENSE, THIRD_PARTY_LICENSES.html "$pkg/"
           Copy-Item -Recurse models/all-MiniLM-L6-v2 "$pkg/models/"
           Copy-Item -Recurse ui/dist "$pkg/ui"
           Copy-Item licenses/all-MiniLM-L6-v2.txt "$pkg/models/all-MiniLM-L6-v2/LICENSE"
