@@ -410,21 +410,21 @@ impl Store {
         Ok(self
             .conn
             .query_row(
-                "SELECT doc_id, ord, text, char_start, char_end, page FROM chunks WHERE id = ?1",
+                "SELECT id, doc_id, ord, text, char_start, char_end, page FROM chunks WHERE id = ?1",
                 [id],
-                |r| {
-                    Ok(Chunk {
-                        id,
-                        doc_id: r.get(0)?,
-                        ord: r.get(1)?,
-                        text: r.get(2)?,
-                        char_start: r.get::<_, i64>(3)? as usize,
-                        char_end: r.get::<_, i64>(4)? as usize,
-                        page: r.get(5)?,
-                    })
-                },
+                chunk_row,
             )
             .optional()?)
+    }
+
+    /// Every chunk, in id order, for building the BM25 index and judging
+    /// relevance.
+    pub fn chunks(&self) -> Result<Vec<Chunk>, StoreError> {
+        let mut select = self.conn.prepare(
+            "SELECT id, doc_id, ord, text, char_start, char_end, page FROM chunks ORDER BY id",
+        )?;
+        let chunks = select.query_map([], chunk_row)?.collect::<Result<_, _>>()?;
+        Ok(chunks)
     }
 
     pub fn chunk_count(&self) -> Result<usize, StoreError> {
@@ -441,6 +441,18 @@ fn mismatch(field: &'static str, built: impl ToString, current: impl ToString) -
         built: built.to_string(),
         current: current.to_string(),
     }
+}
+
+fn chunk_row(r: &rusqlite::Row) -> rusqlite::Result<Chunk> {
+    Ok(Chunk {
+        id: r.get(0)?,
+        doc_id: r.get(1)?,
+        ord: r.get(2)?,
+        text: r.get(3)?,
+        char_start: r.get::<_, i64>(4)? as usize,
+        char_end: r.get::<_, i64>(5)? as usize,
+        page: r.get(6)?,
+    })
 }
 
 fn db_path(dir: &Path) -> PathBuf {

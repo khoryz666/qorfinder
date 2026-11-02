@@ -45,6 +45,10 @@ fn documents_and_chunks_survive_reopening() {
     assert_eq!(store.chunk(2).unwrap(), Some(chunk(2, 1, 0)));
     assert_eq!(store.chunk(3).unwrap(), None);
     assert_eq!(store.document(7).unwrap(), None);
+    assert_eq!(
+        store.chunks().unwrap(),
+        [chunk(0, 0, 0), chunk(1, 0, 1), chunk(2, 1, 0)]
+    );
 }
 
 #[test]
