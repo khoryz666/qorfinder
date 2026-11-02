@@ -75,13 +75,18 @@ enum Command {
         #[arg(long, default_value = "data/cuad/sample")]
         docs: PathBuf,
 
-        /// Folder the TREC files are written to
+        /// Folder the TREC files (or timing.csv) are written to
         #[arg(long, default_value = "results/eval")]
         out: PathBuf,
 
         /// Rebuild the evaluation index even if it is up to date
         #[arg(long)]
         reindex: bool,
+
+        /// Instead, time every query (one warm-up, then 5 runs) against
+        /// the index in --index-dir, such as one of all 510 CUAD contracts
+        #[arg(long)]
+        timing: bool,
 
         #[command(flatten)]
         chunking: ChunkArgs,
@@ -138,9 +143,14 @@ pub fn run() -> Result<()> {
             docs,
             out,
             reindex,
+            timing,
             chunking,
         } => {
             let config = chunking.config()?;
+            if timing {
+                let index_dir = cli.index_dir.unwrap_or_else(default_index_dir);
+                return crate::eval::timing(&testset, &out, &index_dir, &model_dir, config);
+            }
             // Its own index, so evaluating never replaces the user's.
             let index_dir = cli
                 .index_dir
