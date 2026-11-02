@@ -1,0 +1,17 @@
+RRF kappa sweep over the 34 frozen queries (hybrid, all queries)
+kappa    ndcg@10   mrr@10  r-precision
+1         0.2339   0.3257       0.1666
+2         0.2307   0.3110       0.1678
+5         0.2351   0.2988       0.1620
+10        0.2301   0.2917       0.1752
+20        0.2117   0.2610       0.1298
+30        0.2016   0.2525       0.1072
+60        0.1835   0.2545       0.1095
+100       0.1747   0.2358       0.1118
+200       0.1589   0.2297       0.1140
+
+Leave-one-category-out cross-validation (scripts/cv_select.py):
+CV hybrid_ndcg@10 matched      0.3080
+CV hybrid_ndcg@10 paraphrased  0.1477
+CV hybrid_ndcg@10 all          0.2278
+chosen: 5 in 15 of 17 folds, 1 in 2 of 17 folds
