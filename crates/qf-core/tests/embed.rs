@@ -104,27 +104,68 @@ fn padding_does_not_change_an_embedding() {
 }
 
 /// Correctness check for the report: candle must reproduce Python
-/// sentence-transformers. The reference vectors come from
-/// scripts/reference_embeddings.py.
+/// sentence-transformers for every model, on chunks and on queries (each
+/// with the model's prefix), and the registry must hold the settings
+/// sentence-transformers uses. The reference files come from
+/// scripts/reference_embeddings.py. A model whose files have not been
+/// fetched is reported and skipped; the default model must be there.
 #[test]
 #[ignore = "needs models/ from scripts/fetch_model.py"]
 fn embeddings_match_sentence_transformers() {
-    let path =
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/minilm_reference.json");
-    let reference: serde_json::Value =
-        serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
-    let sentences: Vec<&str> = reference["sentences"]
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|s| s.as_str().unwrap())
-        .collect();
-    let expected: Vec<Vec<f32>> = serde_json::from_value(reference["embeddings"].clone()).unwrap();
+    for model in MODELS {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/reference")
+            .join(format!("{}.json", model.dir_name()));
+        let reference: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(reference["model"], model.id);
+        assert_eq!(reference["dim"], model.dim);
+        assert_eq!(reference["max_seq_length"], model.max_seq_len);
+        assert_eq!(reference["query_prefix"], model.query_prefix);
+        assert_eq!(reference["passage_prefix"], model.passage_prefix);
+        let pooling = match model.pooling {
+            Pooling::Mean => "mean",
+            Pooling::Cls => "cls",
+        };
+        assert_eq!(reference["pooling"], pooling, "{}", model.id);
 
-    let actual = load().embed(&sentences).unwrap();
-    for ((sentence, a), e) in sentences.iter().zip(&actual).zip(&expected) {
-        let cosine = dot(a, e) / (dot(a, a).sqrt() * dot(e, e).sqrt());
-        println!("cosine {cosine:.6}  {sentence}");
-        assert!(cosine > 0.99, "cosine {cosine} for {sentence:?}");
+        let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../models")
+            .join(model.dir_name());
+        if model != DEFAULT_MODEL && !dir.is_dir() {
+            println!("skipped {}: not fetched", model.id);
+            continue;
+        }
+        let embedder = Embedder::load(model, &dir).unwrap();
+        let texts =
+            |key: &str| -> Vec<String> { serde_json::from_value(reference[key].clone()).unwrap() };
+        let vectors = |key: &str| -> Vec<Vec<f32>> {
+            serde_json::from_value(reference[key].clone()).unwrap()
+        };
+        let sentences = texts("sentences");
+        let sentences: Vec<&str> = sentences.iter().map(String::as_str).collect();
+        let queries = texts("queries");
+        let chunks = embedder.embed(&sentences).unwrap();
+        let questions: Vec<Vec<f32>> = queries
+            .iter()
+            .map(|q| embedder.embed_query(q).unwrap())
+            .collect();
+
+        let expected_chunks = vectors("embeddings");
+        let expected_queries = vectors("query_embeddings");
+        let pairs = sentences
+            .iter()
+            .map(|s| s.to_string())
+            .zip(chunks.iter().zip(&expected_chunks))
+            .chain(
+                queries
+                    .into_iter()
+                    .zip(questions.iter().zip(&expected_queries)),
+            );
+        for (text, (a, e)) in pairs {
+            let cosine = dot(a, e) / (dot(a, a).sqrt() * dot(e, e).sqrt());
+            println!("{} cosine {cosine:.6}  {text}", model.dir_name());
+            assert!(cosine > 0.99, "{}: cosine {cosine} for {text:?}", model.id);
+        }
     }
 }
