@@ -35,10 +35,11 @@ pub enum IndexError {
 
 /// Batches embedded at the same time, each on its own thread. Every batch
 /// also spreads its matrix products over these threads, so a few keep the
-/// CPU busy; each one in flight adds up to about 150 MB of activations. On
-/// an 8-thread laptop, 4 embedded the CUAD sample 1.55 times as fast as 1,
-/// and 8 only 1.2 times faster again for twice the memory. The vectors are
-/// identical to embedding one batch at a time.
+/// CPU busy, but each one in flight holds its own activations: on a 16-thread
+/// laptop, 4 indexed all 510 CUAD contracts 2.1 times as fast as 1, with a
+/// peak of 2.2 GB instead of 0.75 GB, and 8 were only 1.2 times faster again
+/// on the CUAD sample for twice the memory. The vectors are identical to
+/// embedding one batch at a time.
 pub const EMBED_WORKERS: usize = 4;
 
 /// What an indexing run did and how long each part took.
