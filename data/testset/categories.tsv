@@ -1,0 +1,18 @@
+category	contracts	description
+Affiliate License-Licensee	1	Does the contract contain a license grant to a licensee (incl. sublicensor) and the affiliates of such licensee/sublicensor?
+Competitive Restriction Exception	2	This category includes the exceptions or carveouts to Non-Compete, Exclusivity and No-Solicit of Customers above.
+Covenant Not To Sue	3	Is a party restricted from contesting the validity of the counterparty’s ownership of intellectual property or otherwise bringing a claim against the counterparty for matters unrelated to the contract?
+Irrevocable Or Perpetual License	1	Does the contract contain a  license grant that is irrevocable or perpetual?
+Joint Ip Ownership	4	Is there any clause providing for joint or shared ownership of intellectual property between the parties to the contract?
+Liquidated Damages	2	Does the contract contain a clause that would award either party liquidated damages for breach or a fee upon the termination of a contract (termination fee)?
+Most Favored Nation	1	Is there a clause that if a third party gets better terms on the licensing or sale of technology/goods/services described in the contract, the buyer of such technology/goods/services under the contract shall be entitled to those better terms?
+No-Solicit Of Customers	1	Is a party restricted from contracting or soliciting customers or partners of the counterparty, whether during the contract or after the contract ends (or both)?
+No-Solicit Of Employees	2	Is there a restriction on a party’s soliciting or hiring employees and/or contractors from the  counterparty, whether during the contract or after the contract ends (or both)?
+Non-Compete	4	Is there a restriction on the ability of a party to compete with the counterparty or operate in a certain geography or business or technology sector?
+Non-Disparagement	2	Is there a requirement on a party not to disparage the counterparty?
+Non-Transferable License	4	Does the contract limit the ability of a party to transfer the license being granted to a third party?
+Rofr/Rofo/Rofn	4	Is there a clause granting one party a right of first refusal, right of first offer or right of first negotiation to purchase, license, market, or distribute equity interest, technology, assets, products or services?
+Third Party Beneficiary	4	Is there a non-contracting party who is a beneficiary to some or all of the clauses in the contract and therefore can enforce its rights against a contracting party?
+Uncapped Liability	4	Is a party’s liability uncapped upon the breach of its obligation in the contract? This also includes uncap liability for a particular type of breach such as IP infringement or breach of confidentiality obligation.
+Volume Restriction	2	Is there a fee increase or consent requirement, etc. if one party’s use of the product/services exceeds certain threshold?
+Warranty Duration	3	What is the duration of any  warranty against defects or errors in technology, products, or services  provided under the contract?
