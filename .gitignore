@@ -1,6 +1,7 @@
 /target
 /data/cuad
-/data/eval-index
+/data/eval-index*
+/data/full-index*
 /models
 /doc
 .cache/
