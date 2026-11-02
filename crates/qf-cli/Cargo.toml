@@ -28,5 +28,6 @@ rfd = { version = "0.17", default-features = false, features = ["xdg-portal"] }
 windows-sys = { version = "0.61", features = ["Win32_Foundation", "Win32_System_ProcessStatus", "Win32_System_Threading"] }
 
 [dev-dependencies]
+thiserror.workspace = true
 tempfile = "3"
 tower = { version = "0.5", features = ["util"] }
