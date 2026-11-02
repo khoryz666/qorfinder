@@ -63,6 +63,29 @@ enum Command {
         #[command(flatten)]
         chunking: ChunkArgs,
     },
+    /// Score BM25, semantic search and their RRF fusion on the CUAD test
+    /// set: writes TREC qrels and run files for scripts/score.py
+    Eval {
+        /// Folder holding queries.jsonl and spans.tsv
+        #[arg(long, default_value = "data/testset")]
+        testset: PathBuf,
+
+        /// Folder of the sampled contracts the spans annotate. Never all
+        /// 510 contracts: spans.tsv covers the sample only
+        #[arg(long, default_value = "data/cuad/sample")]
+        docs: PathBuf,
+
+        /// Folder the TREC files are written to
+        #[arg(long, default_value = "results/eval")]
+        out: PathBuf,
+
+        /// Rebuild the evaluation index even if it is up to date
+        #[arg(long)]
+        reindex: bool,
+
+        #[command(flatten)]
+        chunking: ChunkArgs,
+    },
 }
 
 /// Chunk settings. An index can only be searched with the settings it was
@@ -110,8 +133,27 @@ pub fn run() -> Result<()> {
             let index_dir = cli.index_dir.unwrap_or_else(default_index_dir);
             search(&query, k, &index_dir, &model_dir, chunking.config()?)
         }
+        Command::Eval {
+            testset,
+            docs,
+            out,
+            reindex,
+            chunking,
+        } => {
+            let config = chunking.config()?;
+            // Its own index, so evaluating never replaces the user's.
+            let index_dir = cli
+                .index_dir
+                .unwrap_or_else(|| PathBuf::from(EVAL_INDEX_DIR));
+            crate::eval::effectiveness(
+                &testset, &docs, &out, &index_dir, &model_dir, config, reindex,
+            )
+        }
     }
 }
+
+/// The evaluation index, built from the CUAD sample.
+const EVAL_INDEX_DIR: &str = "data/eval-index";
 
 /// Where the model sits relative to the executable in a release, and to
 /// the repository root in development.
@@ -276,7 +318,7 @@ fn dry_run_index(folder: &Path, model_dir: &Path, config: ChunkConfig) -> Result
     Ok(())
 }
 
-fn load_embedder(model_dir: &Path) -> Result<Embedder> {
+pub(crate) fn load_embedder(model_dir: &Path) -> Result<Embedder> {
     Embedder::load(model_dir).with_context(|| {
         format!(
             "cannot load the model from {} (run scripts/fetch_model.py once to download it)",
@@ -285,7 +327,7 @@ fn load_embedder(model_dir: &Path) -> Result<Embedder> {
     })
 }
 
-fn load_tokenizer(model_dir: &Path) -> Result<ModelTokenizer> {
+pub(crate) fn load_tokenizer(model_dir: &Path) -> Result<ModelTokenizer> {
     let path = model_dir.join("tokenizer.json");
     ModelTokenizer::from_file(&path)
         .map_err(|e| anyhow::anyhow!(e))

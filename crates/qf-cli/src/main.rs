@@ -1,4 +1,5 @@
 mod cli;
+mod eval;
 mod memory;
 mod progress;
 
