@@ -374,36 +374,26 @@ impl Store {
     }
 
     pub fn document(&self, id: u32) -> Result<Option<Document>, StoreError> {
-        let row = self
-            .conn
+        self.conn
             .query_row(
-                "SELECT path, format, hash, mtime FROM documents WHERE id = ?1",
+                "SELECT id, path, format, hash, mtime FROM documents WHERE id = ?1",
                 [id],
-                |r| {
-                    Ok((
-                        r.get::<_, String>(0)?,
-                        r.get::<_, String>(1)?,
-                        r.get::<_, Vec<u8>>(2)?,
-                        r.get::<_, i64>(3)?,
-                    ))
-                },
+                document_row,
             )
-            .optional()?;
-        let Some((path, format, hash, mtime)) = row else {
-            return Ok(None);
-        };
-        let format = Format::parse(&format)
-            .ok_or_else(|| StoreError::Corrupt(format!("unknown format {format:?}")))?;
-        let hash = hash
-            .try_into()
-            .map_err(|_| StoreError::Corrupt(format!("bad hash for document {id}")))?;
-        Ok(Some(Document {
-            id,
-            path: PathBuf::from(path),
-            format,
-            hash,
-            mtime,
-        }))
+            .optional()?
+            .map(document_from_row)
+            .transpose()
+    }
+
+    /// Every document, in id order.
+    pub fn documents(&self) -> Result<Vec<Document>, StoreError> {
+        let mut select = self
+            .conn
+            .prepare("SELECT id, path, format, hash, mtime FROM documents ORDER BY id")?;
+        let rows = select
+            .query_map([], document_row)?
+            .collect::<Result<Vec<_>, _>>()?;
+        rows.into_iter().map(document_from_row).collect()
     }
 
     pub fn chunk(&self, id: u32) -> Result<Option<Chunk>, StoreError> {
@@ -441,6 +431,29 @@ fn mismatch(field: &'static str, built: impl ToString, current: impl ToString) -
         built: built.to_string(),
         current: current.to_string(),
     }
+}
+
+/// A documents row as read from SQLite, before its format and hash are
+/// checked.
+type DocumentRow = (u32, String, String, Vec<u8>, i64);
+
+fn document_row(r: &rusqlite::Row) -> rusqlite::Result<DocumentRow> {
+    Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?))
+}
+
+fn document_from_row((id, path, format, hash, mtime): DocumentRow) -> Result<Document, StoreError> {
+    let format = Format::parse(&format)
+        .ok_or_else(|| StoreError::Corrupt(format!("unknown format {format:?}")))?;
+    let hash = hash
+        .try_into()
+        .map_err(|_| StoreError::Corrupt(format!("bad hash for document {id}")))?;
+    Ok(Document {
+        id,
+        path: PathBuf::from(path),
+        format,
+        hash,
+        mtime,
+    })
 }
 
 fn chunk_row(r: &rusqlite::Row) -> rusqlite::Result<Chunk> {
