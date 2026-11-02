@@ -29,14 +29,24 @@ jobs:
       - name: Fetch the model
         run: python3 scripts/fetch_model.py
 
-      # The executable looks for models/all-MiniLM-L6-v2 next to itself, so
-      # the zip unpacks into a folder that runs as it is.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Build the UI
+        run: npm ci && npm run build
+        working-directory: ui
+
+      # The executable looks for models/all-MiniLM-L6-v2 and the built UI
+      # (ui/) next to itself, so the zip unpacks into a folder that runs as
+      # it is.
       - name: Package
         run: |
           pkg=dist/qorfinder
           mkdir -p "$pkg/models"
           cp target/release/qorfinder LICENSE "$pkg/"
           cp -r models/all-MiniLM-L6-v2 "$pkg/models/"
+          cp -r ui/dist "$pkg/ui"
           cp licenses/all-MiniLM-L6-v2.txt "$pkg/models/all-MiniLM-L6-v2/LICENSE"
           cd dist && zip -r "qorfinder-${{ github.ref_name }}-linux-x86_64.zip" qorfinder
 
@@ -61,12 +71,21 @@ jobs:
       - name: Fetch the model
         run: python scripts/fetch_model.py
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Build the UI
+        run: npm ci && npm run build
+        working-directory: ui
+
       - name: Package
         run: |
           $pkg = "dist/qorfinder"
           New-Item -ItemType Directory -Force "$pkg/models" | Out-Null
           Copy-Item target/release/qorfinder.exe, LICENSE "$pkg/"
           Copy-Item -Recurse models/all-MiniLM-L6-v2 "$pkg/models/"
+          Copy-Item -Recurse ui/dist "$pkg/ui"
           Copy-Item licenses/all-MiniLM-L6-v2.txt "$pkg/models/all-MiniLM-L6-v2/LICENSE"
           Compress-Archive -Path $pkg -DestinationPath "dist/qorfinder-${{ github.ref_name }}-windows-x86_64.zip"
 
