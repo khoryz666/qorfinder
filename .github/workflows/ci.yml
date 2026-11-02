@@ -49,6 +49,9 @@ jobs:
       - name: Check the scoring script
         run: nix develop --ignore-environment --keep HOME --command python3 scripts/test_score.py
 
+      - name: Type-check and build the UI
+        run: nix develop --ignore-environment --keep HOME --command sh -c "cd ui && npm ci && npm run build"
+
   windows:
     name: windows
     runs-on: windows-latest
