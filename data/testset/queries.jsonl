@@ -1,0 +1,34 @@
+{"id": "Q01m", "category": "Affiliate License-Licensee", "type": "matched", "text": "license granted to the licensee and its affiliates"}
+{"id": "Q01p", "category": "Affiliate License-Licensee", "type": "paraphrased", "text": "permission to use the rights also extends to companies in the same corporate group as the recipient"}
+{"id": "Q02m", "category": "Competitive Restriction Exception", "type": "matched", "text": "exceptions or carveouts to the non-compete, exclusivity and no-solicit of customers restrictions"}
+{"id": "Q02p", "category": "Competitive Restriction Exception", "type": "paraphrased", "text": "situations where a party may still run a rival business or approach the other side's clients despite the limits"}
+{"id": "Q03m", "category": "Covenant Not To Sue", "type": "matched", "text": "party restricted from contesting the validity of the counterparty's intellectual property ownership or bringing a claim against it"}
+{"id": "Q03p", "category": "Covenant Not To Sue", "type": "paraphrased", "text": "promise never to dispute the other side's title to its patents and trademarks or start legal action against it"}
+{"id": "Q04m", "category": "Irrevocable Or Perpetual License", "type": "matched", "text": "irrevocable or perpetual license grant"}
+{"id": "Q04p", "category": "Irrevocable Or Perpetual License", "type": "paraphrased", "text": "permission to use the rights that lasts forever and cannot be withdrawn"}
+{"id": "Q05m", "category": "Joint Ip Ownership", "type": "matched", "text": "joint or shared ownership of intellectual property between the parties"}
+{"id": "Q05p", "category": "Joint Ip Ownership", "type": "paraphrased", "text": "inventions and patents created together belong to both sides"}
+{"id": "Q06m", "category": "Liquidated Damages", "type": "matched", "text": "liquidated damages for breach or a termination fee"}
+{"id": "Q06p", "category": "Liquidated Damages", "type": "paraphrased", "text": "fixed sum agreed in advance that one side pays if it breaks the deal or ends it early"}
+{"id": "Q07m", "category": "Most Favored Nation", "type": "matched", "text": "most favored nation clause entitling the buyer to better terms given to a third party"}
+{"id": "Q07p", "category": "Most Favored Nation", "type": "paraphrased", "text": "if the seller gives another customer a lower price, this purchaser must receive the same price"}
+{"id": "Q08m", "category": "No-Solicit Of Customers", "type": "matched", "text": "restriction on soliciting or contracting with the counterparty's customers or partners"}
+{"id": "Q08p", "category": "No-Solicit Of Customers", "type": "paraphrased", "text": "must not approach or poach the other company's clients to win their business"}
+{"id": "Q09m", "category": "No-Solicit Of Employees", "type": "matched", "text": "restriction on soliciting or hiring the counterparty's employees or contractors"}
+{"id": "Q09p", "category": "No-Solicit Of Employees", "type": "paraphrased", "text": "must not try to recruit or lure away the other company's staff"}
+{"id": "Q10m", "category": "Non-Compete", "type": "matched", "text": "restriction on a party competing with the counterparty in a geography or business sector"}
+{"id": "Q10p", "category": "Non-Compete", "type": "paraphrased", "text": "must not set up a rival firm in the same territory or market as the other side"}
+{"id": "Q11m", "category": "Non-Disparagement", "type": "matched", "text": "requirement on a party not to disparage the counterparty"}
+{"id": "Q11p", "category": "Non-Disparagement", "type": "paraphrased", "text": "must not say negative things that damage the other company's reputation"}
+{"id": "Q12m", "category": "Non-Transferable License", "type": "matched", "text": "limit on the ability to transfer the license to a third party"}
+{"id": "Q12p", "category": "Non-Transferable License", "type": "paraphrased", "text": "the permission to use the rights cannot be assigned or handed over to another company"}
+{"id": "Q13m", "category": "Rofr/Rofo/Rofn", "type": "matched", "text": "right of first refusal, right of first offer or right of first negotiation"}
+{"id": "Q13p", "category": "Rofr/Rofo/Rofn", "type": "paraphrased", "text": "the other side gets priority to buy the shares or property before any outsider can"}
+{"id": "Q14m", "category": "Third Party Beneficiary", "type": "matched", "text": "third party beneficiary who can enforce rights under the contract"}
+{"id": "Q14p", "category": "Third Party Beneficiary", "type": "paraphrased", "text": "someone who did not sign the agreement may still hold the signing parties to its promises"}
+{"id": "Q15m", "category": "Uncapped Liability", "type": "matched", "text": "uncapped liability for breach, IP infringement or breach of confidentiality"}
+{"id": "Q15p", "category": "Uncapped Liability", "type": "paraphrased", "text": "no upper limit on the amount a party must pay for harm it causes, such as leaking secrets or copying patented work"}
+{"id": "Q16m", "category": "Volume Restriction", "type": "matched", "text": "fee increase or consent requirement if use of the product or services exceeds a threshold"}
+{"id": "Q16p", "category": "Volume Restriction", "type": "paraphrased", "text": "extra charges or approval needed when a customer buys or runs more than an agreed quantity"}
+{"id": "Q17m", "category": "Warranty Duration", "type": "matched", "text": "duration of the warranty against defects or errors in products or services"}
+{"id": "Q17p", "category": "Warranty Duration", "type": "paraphrased", "text": "how long the seller guarantees the goods will work properly after delivery"}
