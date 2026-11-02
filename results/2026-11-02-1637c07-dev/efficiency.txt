@@ -1,0 +1,18 @@
+machine: Lenovo ThinkPad E14 Gen 3, AMD Ryzen 7 5700U (8 cores, 16 threads), 16 GB RAM (14 GiB usable), Linux Mint 22.3 (dev machine, not the T590)
+commit: 1637c07 (embeds 4 batches at a time)
+
+indexed 510 document(s), 39307 chunk(s), 0 skipped, in 1929.1 s (prepare 1.1 s, embed 1927.9 s, 20.4 chunks/s)
+index saved to data/full-index
+peak memory 2245.6 MB
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 32:09.43
+	Maximum resident set size (kbytes): 2299516
+
+index size: 93.0 MB
+source size: 26.8 MB
+
+34 queries over 39307 chunks, median of 5 runs each
+ total: median 45.6 ms, p95 49.1 ms
+encode: median 33.0 ms, p95 36.3 ms
+  scan: median 12.5 ms, p95 12.8 ms
+wrote results/2026-11-02-1637c07-dev/timing.csv
+peak memory 219.3 MB
