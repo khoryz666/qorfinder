@@ -10,8 +10,9 @@ fn closed_output_pipe_is_not_an_error() {
     // Far more chunk lines than a pipe buffers, so writes go on after the
     // reader has gone.
     std::fs::write(docs.path().join("long.txt"), "word ".repeat(200_000)).unwrap();
-    let model_dir =
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../models/all-MiniLM-L6-v2");
+    let model_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../models")
+        .join(qf_core::embed::DEFAULT_MODEL.dir_name());
 
     let mut child = Command::new(env!("CARGO_BIN_EXE_qorfinder"))
         .arg("--model-dir")

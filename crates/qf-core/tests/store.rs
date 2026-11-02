@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use qf_core::embed::DEFAULT_MODEL;
 use qf_core::store::{
     Store, StoreError, VectorWriter, install, is_index_folder_name, is_replaceable, read_vectors,
     staging_dir,
@@ -103,9 +104,9 @@ fn truncated_vector_file_is_rejected() {
 
 fn meta() -> IndexMeta {
     IndexMeta {
-        model_id: "sentence-transformers/all-MiniLM-L6-v2".into(),
+        model_id: DEFAULT_MODEL.id.into(),
         weights_sha256: "53aa5117".into(),
-        dim: 384,
+        dim: DEFAULT_MODEL.dim,
         max_tokens: 200,
         overlap: 40,
     }

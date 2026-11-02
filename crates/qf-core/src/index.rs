@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 use rayon::prelude::*;
 
 use crate::chunk::{ChunkConfig, Tokenize};
-use crate::embed::{BATCH_SIZE, EmbedError, Embedder, MODEL_ID};
+use crate::embed::{BATCH_SIZE, EmbedError, Embedder};
 use crate::ingest::{Skipped, hash_file, walk_except};
 use crate::prepare::prepare;
 use crate::store::{
@@ -81,7 +81,7 @@ impl Progress for () {}
 /// The settings an index built now with `embedder` and `config` records.
 pub fn index_meta(embedder: &Embedder, config: ChunkConfig) -> IndexMeta {
     IndexMeta {
-        model_id: MODEL_ID.to_string(),
+        model_id: embedder.model().id.to_string(),
         weights_sha256: embedder.weights_sha256().to_string(),
         dim: embedder.dim(),
         max_tokens: config.max_tokens,

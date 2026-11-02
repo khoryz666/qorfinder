@@ -239,7 +239,9 @@ fn rejoined_chunks_recover_the_source() {
 
 fn model_tokenizer() -> ModelTokenizer {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../models/all-MiniLM-L6-v2/tokenizer.json");
+        .join("../../models")
+        .join(qf_core::embed::DEFAULT_MODEL.dir_name())
+        .join("tokenizer.json");
     ModelTokenizer::from_file(&path).expect("run scripts/fetch_model.py first")
 }
 

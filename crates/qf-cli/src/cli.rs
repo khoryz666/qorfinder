@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result, bail};
 use clap::{Args, Parser, Subcommand};
 use qf_core::chunk::{ChunkConfig, ModelTokenizer};
-use qf_core::embed::Embedder;
+use qf_core::embed::{DEFAULT_MODEL, Embedder};
 use qf_core::format::{snippet, wrap};
 use qf_core::fusion::RRF_KAPPA;
 use qf_core::index::{build_index, check_index_dir, index_meta};
@@ -348,7 +348,7 @@ fn dry_run_index(folder: &Path, model_dir: &Path, config: ChunkConfig) -> Result
 }
 
 pub(crate) fn load_embedder(model_dir: &Path) -> Result<Embedder> {
-    Embedder::load(model_dir).with_context(|| {
+    Embedder::load(DEFAULT_MODEL, model_dir).with_context(|| {
         format!(
             "cannot load the model from {} (run scripts/fetch_model.py once to download it)",
             model_dir.display()

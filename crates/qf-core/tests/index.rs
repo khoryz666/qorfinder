@@ -2,7 +2,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use qf_core::chunk::{ChunkConfig, ModelTokenizer};
-use qf_core::embed::Embedder;
+use qf_core::embed::{DEFAULT_MODEL, Embedder};
 use std::sync::Mutex;
 
 use qf_core::IndexMeta;
@@ -11,7 +11,9 @@ use qf_core::search::Searcher;
 use qf_core::store::{Store, VECTORS_FILE, read_vectors};
 
 fn model_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../models/all-MiniLM-L6-v2")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../models")
+        .join(DEFAULT_MODEL.dir_name())
 }
 
 /// Records progress events, summing `advance` calls per stage.
@@ -59,7 +61,7 @@ fn indexes_a_folder_and_skips_bad_files() {
     fs::write(docs.path().join("broken.pdf"), "not a pdf").unwrap();
     let index_dir = tempfile::tempdir().unwrap();
 
-    let embedder = Embedder::load(&model_dir()).unwrap();
+    let embedder = Embedder::load(DEFAULT_MODEL, &model_dir()).unwrap();
     let tokenizer = ModelTokenizer::from_file(&model_dir().join("tokenizer.json")).unwrap();
     let config = ChunkConfig {
         max_tokens: 12,
@@ -113,11 +115,12 @@ fn indexes_a_folder_and_skips_bad_files() {
         ]
     );
 
-    let vectors = read_vectors(&index_dir.path().join(VECTORS_FILE), 384).unwrap();
-    assert_eq!(vectors.len(), report.chunks * 384);
+    let dim = embedder.dim();
+    let vectors = read_vectors(&index_dir.path().join(VECTORS_FILE), dim).unwrap();
+    assert_eq!(vectors.len(), report.chunks * dim);
     // Batches are embedded in parallel: every row must still be its own
     // chunk's vector.
-    for (id, row) in vectors.chunks_exact(384).enumerate() {
+    for (id, row) in vectors.chunks_exact(dim).enumerate() {
         let chunk = store.chunk(id as u32).unwrap().unwrap();
         let alone = embedder.embed(&[chunk.text.as_str()]).unwrap().remove(0);
         let cosine: f32 = row.iter().zip(&alone).map(|(a, b)| a * b).sum();
@@ -143,7 +146,7 @@ fn saved_index_is_searched_after_reopening() {
     let index_dir = tempfile::tempdir().unwrap();
     let config = ChunkConfig::default();
     {
-        let embedder = Embedder::load(&model_dir()).unwrap();
+        let embedder = Embedder::load(DEFAULT_MODEL, &model_dir()).unwrap();
         let tokenizer = ModelTokenizer::from_file(&model_dir().join("tokenizer.json")).unwrap();
         build_index(
             docs.path(),
@@ -157,7 +160,7 @@ fn saved_index_is_searched_after_reopening() {
     }
 
     // A fresh "process": nothing but the files on disk.
-    let embedder = Embedder::load(&model_dir()).unwrap();
+    let embedder = Embedder::load(DEFAULT_MODEL, &model_dir()).unwrap();
     let searcher =
         Searcher::open(index_dir.path(), &embedder, &index_meta(&embedder, config)).unwrap();
     let result = searcher
@@ -218,7 +221,7 @@ fn index_inside_the_indexed_folder_is_left_out() {
     )
     .unwrap();
     let index_dir = docs.path().join(".qorfinder/index");
-    let embedder = Embedder::load(&model_dir()).unwrap();
+    let embedder = Embedder::load(DEFAULT_MODEL, &model_dir()).unwrap();
     let tokenizer = ModelTokenizer::from_file(&model_dir().join("tokenizer.json")).unwrap();
 
     for _ in 0..2 {
