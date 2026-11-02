@@ -17,7 +17,7 @@ use qf_core::search::Searcher;
 use qf_core::store::Store;
 use qf_core::{Hit, IndexMeta};
 
-use crate::cli::{load_embedder, load_tokenizer};
+use crate::cli::{ModelFiles, load_embedder, load_tokenizer};
 use crate::progress::Bars;
 
 /// Hits written per query to each run file. Deeper than any query's number
@@ -48,7 +48,7 @@ pub fn effectiveness(
     docs: &Path,
     out: &Path,
     index_dir: &Path,
-    model_dir: &Path,
+    model_files: &ModelFiles,
     config: ChunkConfig,
     reindex: bool,
     kappa: u32,
@@ -58,7 +58,7 @@ pub fn effectiveness(
     let spans = read_spans(&testset.join("spans.tsv"))?;
     // Before the model loads, so a wrong --index-dir fails at once.
     check_index_dir(docs, index_dir)?;
-    let embedder = load_embedder(model_dir)?;
+    let embedder = load_embedder(model_files)?;
     let meta = index_meta(&embedder, config);
     if reindex || !is_index_of(index_dir, docs, &meta) {
         writeln!(
@@ -67,7 +67,7 @@ pub fn effectiveness(
             docs.display(),
             index_dir.display()
         )?;
-        let tokenizer = load_tokenizer(model_dir)?;
+        let tokenizer = load_tokenizer(model_files)?;
         let report = build_index(
             docs,
             index_dir,
@@ -160,12 +160,12 @@ pub fn timing(
     testset: &Path,
     out: &Path,
     index_dir: &Path,
-    model_dir: &Path,
+    model_files: &ModelFiles,
     config: ChunkConfig,
 ) -> Result<()> {
     let mut stdout = std::io::stdout().lock();
     let queries = read_queries(&testset.join("queries.jsonl"))?;
-    let embedder = load_embedder(model_dir)?;
+    let embedder = load_embedder(model_files)?;
     let searcher = Searcher::open(index_dir, &embedder, &index_meta(&embedder, config))?;
     let chunks = searcher.store().chunk_count()?;
 

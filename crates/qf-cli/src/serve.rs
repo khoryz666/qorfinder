@@ -25,7 +25,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tower_http::services::ServeDir;
 
-use crate::cli::{load_embedder, load_tokenizer};
+use crate::cli::{ModelFiles, load_embedder, load_tokenizer};
 
 /// Header the UI sends the token in.
 pub const TOKEN_HEADER: &str = "x-qorfinder-token";
@@ -100,15 +100,20 @@ impl App {
 }
 
 /// Start the server on 127.0.0.1 and open the UI in the browser.
-pub fn run(port: u16, index_dir: &Path, model_dir: &Path, config: ChunkConfig) -> Result<()> {
+pub fn run(
+    port: u16,
+    index_dir: &Path,
+    model_files: &ModelFiles,
+    config: ChunkConfig,
+) -> Result<()> {
     // The server lives as long as the process, so the model can too.
-    let embedder: &'static Embedder = Box::leak(Box::new(load_embedder(model_dir)?));
+    let embedder: &'static Embedder = Box::leak(Box::new(load_embedder(model_files)?));
     let app = Arc::new(App {
         token: new_token()?,
         index_dir: index_dir.to_path_buf(),
         config,
         embedder,
-        tokenizer: load_tokenizer(model_dir)?,
+        tokenizer: load_tokenizer(model_files)?,
         searcher: Mutex::new(None),
         problem: Mutex::new(None),
         job: Mutex::new(Job::default()),

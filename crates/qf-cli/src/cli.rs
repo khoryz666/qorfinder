@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result, bail};
 use clap::{Args, Parser, Subcommand};
 use qf_core::chunk::{ChunkConfig, ModelTokenizer};
-use qf_core::embed::{DEFAULT_MODEL, Embedder};
+use qf_core::embed::{DEFAULT_MODEL, Embedder, MODELS, Model};
 use qf_core::format::{snippet, wrap};
 use qf_core::fusion::RRF_KAPPA;
 use qf_core::index::{build_index, check_index_dir, index_meta};
@@ -26,10 +26,21 @@ pub struct Cli {
     #[arg(long, global = true, env = "QORFINDER_INDEX_DIR")]
     index_dir: Option<PathBuf>,
 
+    /// Embedding model, by Hugging Face id. An index is searched with the
+    /// model it was built with
+    #[arg(
+        long,
+        global = true,
+        env = "QORFINDER_MODEL",
+        default_value = DEFAULT_MODEL.id,
+        value_parser = parse_model,
+    )]
+    model: &'static Model,
+
     /// Folder holding the embedding model files (config.json,
-    /// tokenizer.json, model.safetensors). Defaults to
-    /// models/all-MiniLM-L6-v2 next to the executable, or in the current
-    /// folder when running from the repository
+    /// tokenizer.json, model.safetensors). Defaults to models/<name>, where
+    /// <name> is the last part of the --model id, next to the executable,
+    /// or in the current folder when running from the repository
     #[arg(long, global = true, env = "QORFINDER_MODEL_DIR")]
     model_dir: Option<PathBuf>,
 
@@ -132,9 +143,28 @@ impl ChunkArgs {
     }
 }
 
+/// The `--model` id as a supported model.
+fn parse_model(id: &str) -> Result<&'static Model, String> {
+    Model::find(id).ok_or_else(|| {
+        let ids: Vec<&str> = MODELS.iter().map(|m| m.id).collect();
+        format!("unknown model; supported: {}", ids.join(", "))
+    })
+}
+
+/// The chosen model and the folder holding its files.
+pub(crate) struct ModelFiles {
+    pub model: &'static Model,
+    pub dir: PathBuf,
+}
+
 pub fn run() -> Result<()> {
     let cli = Cli::parse();
-    let model_dir = cli.model_dir.unwrap_or_else(default_model_dir);
+    let model_files = &ModelFiles {
+        model: cli.model,
+        dir: cli
+            .model_dir
+            .unwrap_or_else(|| default_model_dir(cli.model)),
+    };
     match cli.command {
         Command::Index {
             folder,
@@ -143,14 +173,14 @@ pub fn run() -> Result<()> {
         } => {
             let config = chunking.config()?;
             if dry_run {
-                return dry_run_index(&folder, &model_dir, config);
+                return dry_run_index(&folder, model_files, config);
             }
             let index_dir = cli.index_dir.unwrap_or_else(default_index_dir);
-            index(&folder, &index_dir, &model_dir, config)
+            index(&folder, &index_dir, model_files, config)
         }
         Command::Search { query, k, chunking } => {
             let index_dir = cli.index_dir.unwrap_or_else(default_index_dir);
-            search(&query, k, &index_dir, &model_dir, chunking.config()?)
+            search(&query, k, &index_dir, model_files, chunking.config()?)
         }
         Command::Eval {
             testset,
@@ -164,19 +194,26 @@ pub fn run() -> Result<()> {
             let config = chunking.config()?;
             if timing {
                 let index_dir = cli.index_dir.unwrap_or_else(default_index_dir);
-                return crate::eval::timing(&testset, &out, &index_dir, &model_dir, config);
+                return crate::eval::timing(&testset, &out, &index_dir, model_files, config);
             }
             // Its own index, so evaluating never replaces the user's.
             let index_dir = cli
                 .index_dir
                 .unwrap_or_else(|| PathBuf::from(EVAL_INDEX_DIR));
             crate::eval::effectiveness(
-                &testset, &docs, &out, &index_dir, &model_dir, config, reindex, kappa,
+                &testset,
+                &docs,
+                &out,
+                &index_dir,
+                model_files,
+                config,
+                reindex,
+                kappa,
             )
         }
         Command::Serve { port, chunking } => {
             let index_dir = cli.index_dir.unwrap_or_else(default_index_dir);
-            crate::serve::run(port, &index_dir, &model_dir, chunking.config()?)
+            crate::serve::run(port, &index_dir, model_files, chunking.config()?)
         }
     }
 }
@@ -184,18 +221,16 @@ pub fn run() -> Result<()> {
 /// The evaluation index, built from the CUAD sample.
 const EVAL_INDEX_DIR: &str = "data/eval-index";
 
-/// Where the model sits relative to the executable in a release, and to
-/// the repository root in development.
-const MODEL_SUBDIR: &str = "models/all-MiniLM-L6-v2";
-
-/// The model shipped next to the executable, so a release works from any
-/// working folder; otherwise the repository copy, for `cargo run`.
-fn default_model_dir() -> PathBuf {
+/// The model's folder next to the executable, so a release works from any
+/// working folder; otherwise the repository copy, for `cargo run`. Either
+/// way models/<name>, with <name> from the model id.
+fn default_model_dir(model: &Model) -> PathBuf {
+    let subdir = Path::new("models").join(model.dir_name());
     std::env::current_exe()
         .ok()
-        .and_then(|exe| Some(exe.parent()?.join(MODEL_SUBDIR)))
+        .and_then(|exe| Some(exe.parent()?.join(&subdir)))
         .filter(|dir| dir.is_dir())
-        .unwrap_or_else(|| PathBuf::from(MODEL_SUBDIR))
+        .unwrap_or(subdir)
 }
 
 fn default_index_dir() -> PathBuf {
@@ -205,15 +240,20 @@ fn default_index_dir() -> PathBuf {
         .join("index")
 }
 
-fn index(folder: &Path, index_dir: &Path, model_dir: &Path, config: ChunkConfig) -> Result<()> {
+fn index(
+    folder: &Path,
+    index_dir: &Path,
+    model_files: &ModelFiles,
+    config: ChunkConfig,
+) -> Result<()> {
     let mut out = std::io::stdout().lock();
     if !folder.is_dir() {
         bail!("{} is not a folder", folder.display());
     }
     // Before the model loads, so a wrong --index-dir fails at once.
     check_index_dir(folder, index_dir)?;
-    let embedder = load_embedder(model_dir)?;
-    let tokenizer = load_tokenizer(model_dir)?;
+    let embedder = load_embedder(model_files)?;
+    let tokenizer = load_tokenizer(model_files)?;
     let report = build_index(
         folder,
         index_dir,
@@ -257,11 +297,11 @@ fn search(
     query: &str,
     k: usize,
     index_dir: &Path,
-    model_dir: &Path,
+    model_files: &ModelFiles,
     config: ChunkConfig,
 ) -> Result<()> {
     let mut out = std::io::stdout().lock();
-    let embedder = load_embedder(model_dir)?;
+    let embedder = load_embedder(model_files)?;
     let searcher = Searcher::open(index_dir, &embedder, &index_meta(&embedder, config))?;
     let result = searcher.search(query, k)?;
     let store = searcher.store();
@@ -308,9 +348,9 @@ fn search(
 
 /// Print every chunk the indexer would store, with its offsets into the
 /// extracted text and its page, without embedding anything.
-fn dry_run_index(folder: &Path, model_dir: &Path, config: ChunkConfig) -> Result<()> {
+fn dry_run_index(folder: &Path, model_files: &ModelFiles, config: ChunkConfig) -> Result<()> {
     let mut out = std::io::stdout().lock();
-    let tokenizer = load_tokenizer(model_dir)?;
+    let tokenizer = load_tokenizer(model_files)?;
     let (files, mut skipped) = walk(folder);
     let (mut prepared, mut chunks) = (0, 0);
     for file in &files {
@@ -347,23 +387,26 @@ fn dry_run_index(folder: &Path, model_dir: &Path, config: ChunkConfig) -> Result
     Ok(())
 }
 
-pub(crate) fn load_embedder(model_dir: &Path) -> Result<Embedder> {
-    Embedder::load(DEFAULT_MODEL, model_dir).with_context(|| {
+pub(crate) fn load_embedder(model_files: &ModelFiles) -> Result<Embedder> {
+    Embedder::load(model_files.model, &model_files.dir).with_context(|| {
         format!(
-            "cannot load the model from {} (run scripts/fetch_model.py once to download it)",
-            model_dir.display()
+            "cannot load {} from {} (run scripts/fetch_model.py --model {} once to download it)",
+            model_files.model.id,
+            model_files.dir.display(),
+            model_files.model.id,
         )
     })
 }
 
-pub(crate) fn load_tokenizer(model_dir: &Path) -> Result<ModelTokenizer> {
-    let path = model_dir.join("tokenizer.json");
+pub(crate) fn load_tokenizer(model_files: &ModelFiles) -> Result<ModelTokenizer> {
+    let path = model_files.dir.join("tokenizer.json");
     ModelTokenizer::from_file(&path)
         .map_err(|e| anyhow::anyhow!(e))
         .with_context(|| {
             format!(
-                "cannot load {} (run scripts/fetch_model.py once to download the model)",
-                path.display()
+                "cannot load {} (run scripts/fetch_model.py --model {} once to download the model)",
+                path.display(),
+                model_files.model.id,
             )
         })
 }
