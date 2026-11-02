@@ -46,8 +46,8 @@ jobs:
       - name: Test
         run: nix develop --ignore-environment --keep HOME --command cargo test --workspace -- --include-ignored
 
-      - name: Check the scoring tools
-        run: nix develop --ignore-environment --keep HOME --command python3 -c "import ranx, scipy"
+      - name: Check the scoring script
+        run: nix develop --ignore-environment --keep HOME --command python3 scripts/test_score.py
 
   windows:
     name: windows
