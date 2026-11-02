@@ -5,6 +5,7 @@ pub mod bm25;
 pub mod chunk;
 pub mod embed;
 pub mod format;
+pub mod fusion;
 pub mod index;
 pub mod ingest;
 pub mod prepare;
