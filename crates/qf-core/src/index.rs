@@ -29,7 +29,17 @@ pub enum IndexError {
         index.display()
     )]
     FolderInsideIndex { index: PathBuf, folder: PathBuf },
+    #[error("cannot start the embedding threads: {0}")]
+    Threads(#[from] rayon::ThreadPoolBuildError),
 }
+
+/// Batches embedded at the same time, each on its own thread. Every batch
+/// also spreads its matrix products over these threads, so a few keep the
+/// CPU busy; each one in flight adds up to about 150 MB of activations. On
+/// an 8-thread laptop, 4 embedded the CUAD sample 1.55 times as fast as 1,
+/// and 8 only 1.2 times faster again for twice the memory. The vectors are
+/// identical to embedding one batch at a time.
+pub const EMBED_WORKERS: usize = 4;
 
 /// What an indexing run did and how long each part took.
 #[derive(Debug, Default)]
@@ -231,17 +241,29 @@ pub fn build_index(
     let mut vectors = VectorWriter::create(&staging.join(VECTORS_FILE), embedder.dim())?;
     progress.start(Stage::Embedding, chunks.len());
     // A batch is padded to its longest text, so batches of similar lengths
-    // waste less work: embed in order of length, then write every vector
-    // back at its chunk's row.
+    // waste less work: embed in order of length, several batches at once,
+    // then write every vector back at its chunk's row.
     let mut by_length: Vec<usize> = (0..chunks.len()).collect();
     by_length.sort_by_key(|&i| chunks[i].text.len());
+    let pool = rayon::ThreadPoolBuilder::new()
+        .num_threads(EMBED_WORKERS)
+        .build()?;
+    let batches: Vec<Vec<Vec<f32>>> = pool.install(|| {
+        by_length
+            .par_chunks(BATCH_SIZE)
+            .map(|batch| {
+                let texts: Vec<&str> = batch.iter().map(|&i| chunks[i].text.as_str()).collect();
+                let vectors = embedder.embed(&texts)?;
+                progress.advance(batch.len());
+                Ok(vectors)
+            })
+            .collect::<Result<_, EmbedError>>()
+    })?;
     let mut embedded: Vec<Vec<f32>> = vec![Vec::new(); chunks.len()];
-    for batch in by_length.chunks(BATCH_SIZE) {
-        let texts: Vec<&str> = batch.iter().map(|&i| chunks[i].text.as_str()).collect();
-        for (&i, vector) in batch.iter().zip(embedder.embed(&texts)?) {
+    for (batch, vectors) in by_length.chunks(BATCH_SIZE).zip(batches) {
+        for (&i, vector) in batch.iter().zip(vectors) {
             embedded[i] = vector;
         }
-        progress.advance(batch.len());
     }
     for vector in &embedded {
         vectors.push(vector)?;

@@ -115,6 +115,14 @@ fn indexes_a_folder_and_skips_bad_files() {
 
     let vectors = read_vectors(&index_dir.path().join(VECTORS_FILE), 384).unwrap();
     assert_eq!(vectors.len(), report.chunks * 384);
+    // Batches are embedded in parallel: every row must still be its own
+    // chunk's vector.
+    for (id, row) in vectors.chunks_exact(384).enumerate() {
+        let chunk = store.chunk(id as u32).unwrap().unwrap();
+        let alone = embedder.embed(&[chunk.text.as_str()]).unwrap().remove(0);
+        let cosine: f32 = row.iter().zip(&alone).map(|(a, b)| a * b).sum();
+        assert!(cosine > 0.9999, "chunk {id}: cosine {cosine}");
+    }
 }
 
 /// T4: an index survives a restart and is searched without re-indexing.
