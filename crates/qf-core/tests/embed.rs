@@ -54,6 +54,23 @@ fn loads_minilm() {
 }
 
 #[test]
+#[ignore = "needs the fine-tuned model from scripts/finetune_minilm.py"]
+fn loads_finetuned_minilm() {
+    let model = Model::find("all-MiniLM-L6-v2-ft-cuad").unwrap();
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../models")
+        .join(model.dir_name());
+    let embedder = Embedder::load(model, &dir).unwrap();
+    assert_eq!(embedder.dim(), 384);
+    // The lowest-validation-loss epoch of the fine-tune,
+    // SHA-256 pinned for reproducibility.
+    assert_eq!(
+        embedder.weights_sha256(),
+        "2a164e0ea9bbcb15e7476881eb403d264451063df834696b8e7869cff2848bf3"
+    );
+}
+
+#[test]
 fn missing_model_dir_is_an_io_error() {
     let err = Embedder::load(
         DEFAULT_MODEL,
