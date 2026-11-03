@@ -1,0 +1,49 @@
+warning: Git tree '/home/hongye/Desktop/qorfinder' is dirty
+held-out contracts: 480
+clauses per category (total 2451):
+  Affiliate License-Licensee         113
+  Competitive Restriction Exception  122
+  Covenant Not To Sue                168
+  Irrevocable Or Perpetual License   155
+  Joint Ip Ownership                 110
+  Liquidated Damages                 116
+  Most Favored Nation                36
+  No-Solicit Of Customers            56
+  No-Solicit Of Employees            89
+  Non-Compete                        252
+  Non-Disparagement                  62
+  Non-Transferable License           293
+  Rofr/Rofo/Rofn                     348
+  Third Party Beneficiary            35
+  Uncapped Liability                 159
+  Volume Restriction                 164
+  Warranty Duration                  173
+Loading weights:   0%|          | 0/103 [00:00<?, ?it/s]Loading weights: 100%|██████████| 103/103 [00:00<00:00, 1997.53it/s]
+
+per-category (mean over its 3 templates): margin = own-clause cosine minus other-clause cosine; rec@10 = share of top-10 clauses of its own category
+category                             margin   rec@10 top-1 hits
+Affiliate License-Licensee           0.1420   0.5667    3/3
+Competitive Restriction Exception    0.0306   0.0667    0/3
+Covenant Not To Sue                  0.0832   0.3000    1/3
+Irrevocable Or Perpetual License     0.0928   0.3667    2/3
+Joint Ip Ownership                   0.2073   0.9667    3/3
+Liquidated Damages                   0.1696   0.6667    2/3
+Most Favored Nation                  0.0584   0.1667    0/3
+No-Solicit Of Customers              0.0816   0.1000    1/3
+No-Solicit Of Employees              0.1673   0.8333    3/3
+Non-Compete                          0.0829   0.6000    1/3
+Non-Disparagement                    0.1018   0.4667    2/3
+Non-Transferable License             0.1239   0.5000    1/3
+Rofr/Rofo/Rofn                       0.0755   0.7000    3/3
+Third Party Beneficiary              0.1495   0.2667    2/3
+Uncapped Liability                   0.2637   0.9333    3/3
+Volume Restriction                   0.0107   0.4333    2/3
+Warranty Duration                    0.1706   0.8000    3/3
+
+--- summary ---
+templates: 51 (17 categories x 3)
+mean margin: 0.1183
+templates with positive margin: 50/51 (sign-test p=4.62e-14)
+mean recall@10 of own category: 0.5137 (chance 0.059)
+top-1 hit rate: 0.627 (chance 0.059, 10.7x chance)
+PASS: templates are meaningful, load-bearing queries for their categories.

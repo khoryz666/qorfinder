@@ -1,0 +1,45 @@
+Fine-tuned all-MiniLM-L6-v2 (all-MiniLM-L6-v2-ft-cuad) on the 34 frozen queries
+(30 CUAD contracts, seed 2026, chunks 200/40, RRF kappa = 5 unless stated)
+Reproduce at 20662e2 (commands in the README's Fine-tuning section):
+  scripts/check_templates.py > check_templates.txt; scripts/tune_hyperparams.py -> hyperparams.tsv
+  scripts/finetune_minilm.py --save-best --learning-rate 1e-5 -> train.log, model-best/
+  qorfinder --model all-MiniLM-L6-v2-ft-cuad --index-dir data/eval-ft eval --reindex --out results/finetune-minilm/eval
+  python3 scripts/score.py results/finetune-minilm/eval
+  qorfinder --model all-MiniLM-L6-v2-ft-cuad --index-dir data/eval-ft eval --timing --out results/finetune-minilm/timing
+
+Training data: the 480 CUAD contracts outside data/testset/docs.txt, split by contract 432 train / 48 val.
+51 queries (3 per test category) x every annotated clause of that category: 6771 train / 582 val pairs.
+No query shares a 3-word phrase with any of the 34 test queries (audit_templates, checked before every run).
+Check against the base model (check_templates.txt): 50/51 queries closer to their own category, top-1 10.7x chance.
+Loss: in-batch negatives (MultipleNegativesRankingLoss), batch 16 = one pair per category, temperature 0.05,
+max 128 tokens, 3 epochs, CPU, 29.9 min. Learning rate by validation loss (hyperparams.tsv): 1e-5.
+Validation loss by epoch 1.5281 / 1.4228 / 1.4139: the last epoch kept, model.safetensors sha256
+2a164e0ea9bbcb15e7476881eb403d264451063df834696b8e7869cff2848bf3. Rust matches Python at cosine 1.000000.
+
+nDCG@10 (MRR@10)      matched          paraphrased      all
+bm25                  0.3227 (0.4289)  0.1055 (0.1353)  0.2141 (0.2821)
+semantic, base        0.2068 (0.3515)  0.1306 (0.2059)  0.1687 (0.2787)   results/model-sweep/minilm
+semantic, fine-tuned  0.4472 (0.5157)  0.3917 (0.5172)  0.4194 (0.5164)
+hybrid, fine-tuned    0.4170 (0.5090)  0.2834 (0.4020)  0.3502 (0.4555)
+Wilcoxon, fine-tuned semantic vs bm25: matched p = 0.064, paraphrased p = 0.0037, all p = 0.0005;
+hybrid vs fine-tuned semantic: all p = 0.0086 (the hybrid is lower).
+
+Leave-one-category-out cross-validation over the five models (scripts/cv_select.py, with results/model-sweep/):
+CV semantic_ndcg@10 matched 0.4472, paraphrased 0.3917, all 0.4194; chosen: ft-minilm in 17 of 17 folds
+CV hybrid_ndcg@10   matched 0.4170, paraphrased 0.2835, all 0.3502; chosen: ft-minilm in 17 of 17 folds
+
+RRF kappa sweep with the fine-tuned model (eval --kappa K, hybrid, all queries):
+kappa    ndcg@10   mrr@10  r-precision
+1         0.3557   0.4758       0.2888
+2         0.3524   0.4699       0.2888
+5         0.3502   0.4555       0.2961
+10        0.3494   0.4604       0.3019
+20        0.3442   0.4743       0.2883
+30        0.3303   0.4478       0.2925
+60        0.3176   0.4329       0.2607
+100       0.3124   0.4292       0.2523
+200       0.3016   0.4292       0.2572
+CV hybrid_ndcg@10 all 0.3557 (chosen: 1 in 17 of 17 folds). Every kappa stays below semantic alone (0.4194).
+
+Efficiency on the dev machine (Ryzen 7 5700U, 16 GB, release build), same as the base model:
+index 4.0 MB; query median 33.5 ms, p95 36.3 ms (timing/timing.csv); timing peak 188.5 MB.
