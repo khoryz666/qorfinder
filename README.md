@@ -65,6 +65,7 @@ Each supported model is one entry in `crates/qf-core/src/embed/models.rs`
 | `sentence-transformers/all-mpnet-base-v2` | MPNet, 12 layers | 768 | mean | none |
 | `BAAI/bge-base-en-v1.5` | BERT, 12 layers | 768 | first token | `Represent this sentence for searching relevant passages: ` / none |
 | `intfloat/e5-base-v2` | BERT, 12 layers | 768 | mean | `query: ` / `passage: ` |
+| `all-MiniLM-L6-v2-ft-cuad` | BERT, 6 layers | 384 | mean | none (trained here, see [Fine-tuning](#fine-tuning)) |
 
 ```bash
 python3 scripts/fetch_model.py --model intfloat/e5-base-v2
@@ -75,6 +76,8 @@ The four were compared on the frozen test set in `results/model-sweep/`
 (`sweep.txt`). The default stays all-MiniLM-L6-v2: all-mpnet-base-v2 scores
 best, but no model brings semantic search within 0.05 nDCG@10 of BM25 on the
 matched queries, and the base models are about 3.4× slower per query.
+The fine-tuned MiniLM does (`results/finetune-minilm/summary.txt`), but it is
+trained locally, not published, so the release keeps the original weights.
 
 ## How it works
 
@@ -132,6 +135,31 @@ qorfinder --index-dir <index of data/cuad/txt> eval --timing   # latency
 `scripts/cv_select.py` picks a setting (such as `--kappa`) from several scored
 runs by leave-one-category-out cross-validation.
 
+## Fine-tuning
+
+`all-MiniLM-L6-v2-ft-cuad` is all-MiniLM-L6-v2 fine-tuned on the annotated
+clauses of the 480 CUAD contracts outside the test sample, for the test
+set's 17 categories. The training queries are three hand-written paraphrases
+per category; the scripts refuse to run if any shares a three-word phrase
+with a test query. Training needs PyTorch, so it runs in the reference shell,
+on the CPU (about half an hour on the dev machine):
+
+```bash
+nix develop .#reference   # PyTorch and transformers
+python3 scripts/check_templates.py    # each query is closest to its own category
+python3 scripts/tune_hyperparams.py   # learning rate by validation loss
+python3 scripts/finetune_minilm.py --save-best --learning-rate <the best one>
+mkdir -p models/all-MiniLM-L6-v2-ft-cuad
+cp results/finetune-minilm/model-best/* models/all-MiniLM-L6-v2-ft-cuad/
+python3 scripts/reference_embeddings_ft.py
+exit
+qorfinder --model all-MiniLM-L6-v2-ft-cuad --index-dir data/eval-ft eval --reindex --out results/finetune-minilm/eval
+```
+
+Training checkpoints every epoch, and the same command resumes from the
+newest checkpoint; `scripts/smoke_test_finetune.py` checks that in a minute.
+The run and its scores are in `results/finetune-minilm/`.
+
 ## Develop
 
 ```bash
@@ -157,7 +185,7 @@ Layout:
 crates/qf-core/   library: ingest, chunk, embed, store, index, search, bm25, fusion, eval
 crates/qf-cli/    the `qorfinder` binary and the local API (serve)
 ui/               React + TypeScript UI, built with Vite to ui/dist
-scripts/          model download, CUAD preparation, scoring, reference embeddings
+scripts/          model download, CUAD preparation, scoring, reference embeddings, fine-tuning
 licenses/         licence of the bundled model (Apache-2.0)
 ref/              proposal and IIPSPW report
 ```
