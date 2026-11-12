@@ -59,13 +59,13 @@ Each supported model is one entry in `crates/qf-core/src/embed/models.rs`
 (architecture, vector size, input length, pooling and prefixes) and one in
 `scripts/fetch_model.py` (pinned revision and SHA-256 of every file).
 
-| `--model` | Architecture | Size | Pooling | Query / passage prefix |
-|---|---|---|---|---|
-| `sentence-transformers/all-MiniLM-L6-v2` (default) | BERT, 6 layers | 384 | mean | none |
-| `sentence-transformers/all-mpnet-base-v2` | MPNet, 12 layers | 768 | mean | none |
-| `BAAI/bge-base-en-v1.5` | BERT, 12 layers | 768 | first token | `Represent this sentence for searching relevant passages: ` / none |
-| `intfloat/e5-base-v2` | BERT, 12 layers | 768 | mean | `query: ` / `passage: ` |
-| `all-MiniLM-L6-v2-ft-cuad` | BERT, 6 layers | 384 | mean | none (trained here, see [Fine-tuning](#fine-tuning)) |
+| `--model`                                          | Architecture     | Size | Pooling     | Query / passage prefix                                             |
+| -------------------------------------------------- | ---------------- | ---- | ----------- | ------------------------------------------------------------------ |
+| `sentence-transformers/all-MiniLM-L6-v2` (default) | BERT, 6 layers   | 384  | mean        | none                                                               |
+| `sentence-transformers/all-mpnet-base-v2`          | MPNet, 12 layers | 768  | mean        | none                                                               |
+| `BAAI/bge-base-en-v1.5`                            | BERT, 12 layers  | 768  | first token | `Represent this sentence for searching relevant passages: ` / none |
+| `intfloat/e5-base-v2`                              | BERT, 12 layers  | 768  | mean        | `query: ` / `passage: `                                            |
+| `all-MiniLM-L6-v2-ft-cuad`                         | BERT, 6 layers   | 384  | mean        | none (trained here, see [Fine-tuning](#fine-tuning))               |
 
 ```bash
 python3 scripts/fetch_model.py --model intfloat/e5-base-v2
