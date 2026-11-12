@@ -60,6 +60,10 @@ fn loads_finetuned_minilm() {
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../models")
         .join(model.dir_name());
+    if !dir.is_dir() {
+        println!("skipped {}: not fetched", model.id);
+        return;
+    }
     let embedder = Embedder::load(model, &dir).unwrap();
     assert_eq!(embedder.dim(), 384);
     // The lowest-validation-loss epoch of the fine-tune,
