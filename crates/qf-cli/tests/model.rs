@@ -41,7 +41,8 @@ fn model_folder_comes_from_the_model_id() {
         dir.path(),
     );
     assert!(!out.status.success());
-    let stderr = String::from_utf8_lossy(&out.stderr);
+    // Paths print with the platform separator, so compare in one form.
+    let stderr = String::from_utf8_lossy(&out.stderr).replace('\\', "/");
     assert!(
         stderr.contains("models/e5-base-v2/tokenizer.json"),
         "{stderr}"
