@@ -1,0 +1,100 @@
+T7: add, modify and delete a file, then rebuild (release zip v0.0.0, Windows 10 Pro 22H2)
+folder: data/t7-change, three CUAD TXT files copied as A-collaboration.txt, B-consulting.txt, C-development.txt
+
+== 1. before the change
+indexed 3 document(s), 149 chunk(s), 0 skipped, in 10.8 s (prepare 0.0 s, embed 10.7 s, 13.9 chunks/s)
+
+$ qorfinder search "who must plant an olive tree for every hundred units sold?" -k 3
+ 1. 0.237  A-collaboration.txt
+           CAPSUGEL shall manufacture the Product for each Marketer unless
+ 2. 0.222  B-consulting.txt
+           THIS IS SCHEDULE "A" TO THE CONSULTING AGREEMENT BETWEEN CORAL GOLD
+           RESOURCES LTD. AND lNTERMARK CAPlTAL CORP. Description of Consulting
+           Services: The Consultant shall provide management and financial
+ 3. 0.206  A-collaboration.txt
+           C:\Users\hongye\Desktop\qorfinder\data\t7-change · characters 12834–13101
+           technical, intellectual property and regulatory aspects and keep the
+
+$ qorfinder search "how must the consultant deliver the reports?" -k 3
+ 1. 0.550  B-consulting.txt
+           Consultant hereby accepts such appointment and engagement by the
+           Company, all upon and subject to the terms and conditions of this
+           Agreement. 2.…
+ 2. 0.521  B-consulting.txt
+ 3. 0.503  B-consulting.txt
+           THIS IS SCHEDULE "A" TO THE CONSULTING AGREEMENT BETWEEN CORAL GOLD
+           RESOURCES LTD. AND lNTERMARK CAPlTAL CORP. Description of Consulting
+           Services: The Consultant shall provide management and financial
+           C:\Users\hongye\Desktop\qorfinder\data\t7-change · characters 1562–2540
+           1.1 The Company hereby appoints and engages the Consultant as a
+
+$ qorfinder search "CNS Pharmaceuticals development agreement" -k 3
+ 1. 0.662  C-development.txt
+ 2. 0.661  C-development.txt
+ 3. 0.661  C-development.txt
+           C:\Users\hongye\Desktop\qorfinder\data\t7-change · characters 17112–17164
+           4 Source: CNS PHARMACEUTICALS, INC., 8-K, 3/26/2020
+
+== 2. change: add D-new.txt, append a sentence to B-consulting.txt, delete C-development.txt
+
+== 3. after rebuilding
+indexed 3 document(s), 118 chunk(s), 0 skipped, in 10.5 s (prepare 0.0 s, embed 10.4 s, 11.3 chunks/s)
+
+$ qorfinder search "who must plant an olive tree for every hundred units sold?" -k 3
+ 1. 0.830  D-new.txt
+           ADDENDUM. The Licensee shall plant one olive tree for every hundred
+ 2. 0.237  A-collaboration.txt
+           CAPSUGEL shall manufacture the Product for each Marketer unless
+ 3. 0.222  B-consulting.txt
+           THIS IS SCHEDULE "A" TO THE CONSULTING AGREEMENT BETWEEN CORAL GOLD
+           RESOURCES LTD. AND lNTERMARK CAPlTAL CORP. Description of Consulting
+           Services: The Consultant shall provide management and financial
+           C:\Users\hongye\Desktop\qorfinder\data\t7-change · characters 0–100
+           ADDENDUM. The Licensee shall plant one olive tree for every hundred
+
+$ qorfinder search "how must the consultant deliver the reports?" -k 3
+ 1. 0.550  B-consulting.txt
+           Consultant hereby accepts such appointment and engagement by the
+           Company, all upon and subject to the terms and conditions of this
+           Agreement. 2.…
+ 2. 0.521  B-consulting.txt
+ 3. 0.503  B-consulting.txt
+           THIS IS SCHEDULE "A" TO THE CONSULTING AGREEMENT BETWEEN CORAL GOLD
+           RESOURCES LTD. AND lNTERMARK CAPlTAL CORP. Description of Consulting
+           Services: The Consultant shall provide management and financial
+           C:\Users\hongye\Desktop\qorfinder\data\t7-change · characters 1562–2540
+           1.1 The Company hereby appoints and engages the Consultant as a
+
+$ qorfinder search "CNS Pharmaceuticals development agreement" -k 3
+ 1. 0.429  A-collaboration.txt
+ 2. 0.426  A-collaboration.txt
+ 3. 0.415  B-consulting.txt
+           C:\Users\hongye\Desktop\qorfinder\data\t7-change · characters 11967–13064
+           the dates determined a s reasonably necessary for conducting all
+
+C-development.txt in any of the top 50 results for the delete query after rebuilding:
+0
+
+== 4. second modify: edit wording inside an existing clause (B-consulting.txt, 20.1 notices)
+$ qorfinder search "can notices be sent by carrier pigeon?" -k 1   (before)
+ 1. 0.427  B-consulting.txt
+           C:\Users\hongye\Desktop\qorfinder\data\t7-change · characters 22457–23405
+           20.1 All notices required or permitted under this Agreement shall be in
+changed: "by pre-paid registered mail, by facsimile transmission or electronic mail" -> "only by carrier pigeon"
+indexed 3 document(s), 117 chunk(s), 0 skipped, in 8.4 s (prepare 0.0 s, embed 8.3 s, 14.1 chunks/s)
+$ qorfinder search "can notices be sent by carrier pigeon?" -k 1   (after rebuilding)
+ 1. 0.546  B-consulting.txt
+           C:\Users\hongye\Desktop\qorfinder\data\t7-change · characters 22641–23576
+           20.1 All notices required or permitted under this Agreement shall be in
+
+== 5. rank of the appended clause (chunk #39 of B-consulting.txt, characters 29144-29872, after step 3)
+"how must the consultant deliver the reports?"                     -> rank 20, score 0.393
+exact sentence "The Consultant shall deliver every written report ..." -> rank 13, score 0.442
+index --dry-run shows the clause was merged into the file's last chunk with ~700 characters of unrelated text.
+
+== summary
+add:    D-new.txt indexed; its clause is rank 1 (0.830) after rebuilding, absent before.
+delete: C-development.txt gone; 0 of the top 50 results for its query after rebuilding (rank 1-3 before).
+modify: both edits reached the index (new chunk text, ranges and scores). The in-clause edit stayed rank 1 (0.427 -> 0.546).
+        The clause appended at the end of a file was indexed but ranked 13th even for its exact wording,
+        because it shares a chunk with unrelated text.

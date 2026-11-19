@@ -1,0 +1,16 @@
+$ qorfinder --index-dir <tmp> serve        (release zip, unpacked, Windows 10 Pro 22H2)
+QorFinder is running at http://127.0.0.1:58545/?token=<32 hex digits>
+
+GET /?token=...                                   -> 200 (UI served)
+GET /api/status        without token header       -> 403
+GET /api/status        with token, Host: evil.example -> 403
+GET /api/status        with token                 -> ready, 30 documents, 2029 chunks
+GET /api/search?q=which state's law governs this agreement&k=2 -> rank 1 ADIANUTRITION ... RESELLER AGREEMENT.docx, characters 24893-25692 ("6.7 GOVERNING LAW ...")
+
+Checked by the developer in the browser:
+- Search "can the affiliate keep earning commission after the agreement ends?", Open file on rank 1
+  (UsioInc_20040428_SB-2_EX-10.11_1723988_EX-10.11_Affiliate Agreement 2.pdf, page 4):
+  the PDF opened with no error and "Section 5.02 [TERMINATION]" is on page 4.  -> T5 (PDF), T12 (page)
+- Wi-Fi turned off, searched again: results returned as before.                 -> T8
+- Search "which state's law governs this agreement?", Open file on rank 1
+  (ADIANUTRITION,INC_04_01_2005-EX-10.D2-RESELLER AGREEMENT.docx): opened correctly.     -> T5 (DOCX)

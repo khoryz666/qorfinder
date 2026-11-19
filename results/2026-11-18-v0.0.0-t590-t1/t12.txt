@@ -1,0 +1,106 @@
+T12: 20 PDF results from the test queries over data/t1-mixed (release v0.0.0, Windows 10)
+Results picked: for each test query in order, its highest-ranked PDF result (top 10) not already listed, until 20.
+Check: the first 8 words of the passage (letters and digits only) were searched in every page's text as read by
+pypdf 5.1.0, a PDF reader independent of the pdf-extract/lopdf used by QorFinder. Scripts: t12_pick.py and t12_check.py in this folder.
+Result: 20 of 20 found on the reported page and on no other page.
+
+ 1. [Q01m] rank 1: "license granted to the licensee and its affiliates"
+    DigitalCinemaDestinationsCorp_20111220_S-1_EX-10.10_7346719_EX-10.10_Affiliate Agreement.pdf · page 27 · characters 87900-88839
+    starts: "(collectively, “Derived Works”), shall be owned solely and exclusively by NCM, and ..."
+    check: found on page 27 only (ok)
+
+ 2. [Q01p] rank 2: "permission to use the rights also extends to companies in the same corporate group as the recipient"
+    CybergyHoldingsInc_20140520_10-Q_EX-10.27_8605784_EX-10.27_Affiliate Agreement.pdf · page 2 · characters 1978-3035
+    starts: "General Rights. Subject to the terms and conditions of this Agreement, Company ..."
+    check: found on page 2 only (ok)
+
+ 3. [Q02m] rank 2: "exceptions or carveouts to the non-compete, exclusivity and no-solicit of customers restrictions"
+    DigitalCinemaDestinationsCorp_20111220_S-1_EX-10.10_7346719_EX-10.10_Affiliate Agreement.pdf · page 18 · characters 57853-58911
+    starts: "Section 3.11 (Grand Openings, Employee Uniforms), collectively, the “Exclusivity Exceptions”, Network Affiliate ..."
+    check: found on page 18 only (ok)
+
+ 4. [Q02p] rank 3: "situations where a party may still run a rival business or approach the other side's clients despite the limits"
+    DigitalCinemaDestinationsCorp_20111220_S-1_EX-10.10_7346719_EX-10.10_Affiliate Agreement.pdf · page 25 · characters 82128-83225
+    starts: "(a) During the Term, except as otherwise provided in this Agreement, Network ..."
+    check: found on page 25 only (ok)
+
+ 5. [Q03m] rank 3: "party restricted from contesting the validity of the counterparty's intellectual property ownership or bringing a claim against it"
+    DigitalCinemaDestinationsCorp_20111220_S-1_EX-10.10_7346719_EX-10.10_Affiliate Agreement.pdf · page 27 · characters 87192-88074
+    starts: "Section 12.2 Derived Works. Any and all data, information, and material created, ..."
+    check: found on page 27 only (ok)
+
+ 6. [Q03p] rank 1: "promise never to dispute the other side's title to its patents and trademarks or start legal action against it"
+    CybergyHoldingsInc_20140520_10-Q_EX-10.27_8605784_EX-10.27_Affiliate Agreement.pdf · page 7 · characters 15315-16322
+    starts: "Company agrees to defend or, at its option, settle any claim or ..."
+    check: found on page 7 only (ok)
+
+ 7. [Q04p] rank 5: "permission to use the rights that lasts forever and cannot be withdrawn"
+    DigitalCinemaDestinationsCorp_20111220_S-1_EX-10.10_7346719_EX-10.10_Affiliate Agreement.pdf · page 6 · characters 16385-16717
+    starts: "shall not be permitted to permanently discontinue Service to any Theatre without ..."
+    check: found on page 6 only (ok)
+
+ 8. [Q05m] rank 3: "joint or shared ownership of intellectual property between the parties"
+    DigitalCinemaDestinationsCorp_20111220_S-1_EX-10.10_7346719_EX-10.10_Affiliate Agreement.pdf · page 14 · characters 43806-43838
+    starts: "ARTICLE V INTELLECTUAL PROPERTY ..."
+    check: found on page 14 only (ok)
+
+ 9. [Q06m] rank 2: "liquidated damages for breach or a termination fee"
+    CybergyHoldingsInc_20140520_10-Q_EX-10.27_8605784_EX-10.27_Affiliate Agreement.pdf · page 10 · characters 22038-23059
+    starts: "Termination. This Agreement may be terminated by either party at the expiration ..."
+    check: found on page 10 only (ok)
+
+10. [Q06p] rank 5: "fixed sum agreed in advance that one side pays if it breaks the deal or ends it early"
+    SouthernStarEnergyInc_20051202_SB-2A_EX-9_801890_EX-9_Affiliate Agreement.pdf · page 4 · characters 10423-11280
+    starts: "(5) The Advertising Cost Compensation shall not be paid if and insofar ..."
+    check: found on page 4 only (ok)
+
+11. [Q07m] rank 10: "most favored nation clause entitling the buyer to better terms given to a third party"
+    UnionDentalHoldingsInc_20050204_8-KA_EX-10_3345577_EX-10_Affiliate Agreement.pdf · page 2 · characters 8774-9158
+    starts: "b. Amendment. This Agreement may not be modified or amended, except in ..."
+    check: found on page 2 only (ok)
+
+12. [Q07p] rank 10: "if the seller gives another customer a lower price, this purchaser must receive the same price"
+    CybergyHoldingsInc_20140520_10-Q_EX-10.27_8605784_EX-10.27_Affiliate Agreement.pdf · page 15 · characters 31291-32166
+    starts: "Note 2: Note 3: Note 4: Note 5: Note 6: 2. (a) ..."
+    check: found on page 15 only (ok)
+
+13. [Q08m] rank 1: "restriction on soliciting or contracting with the counterparty's customers or partners"
+    UsioInc_20040428_SB-2_EX-10.11_1723988_EX-10.11_Affiliate Agreement 2.pdf · page 1 · characters 2341-3492
+    starts: "1.01 CONTRACTORS. Affiliate shall use its best efforts to market and sell ..."
+    check: found on page 1 only (ok)
+
+14. [Q09m] rank 3: "restriction on soliciting or hiring the counterparty's employees or contractors"
+    2ThemartComInc_19990826_10-12G_EX-10.10_6700288_EX-10.10_Co-Branding Agreement_ Agency Agreement.pdf · page 8 · characters 23402-24386
+    starts: "12.4 FORCE MAJEURE. Except as otherwise provided, if performance hereunder (other than ..."
+    check: found on page 8 only (ok)
+
+15. [Q09p] rank 2: "must not try to recruit or lure away the other company's staff"
+    DigitalCinemaDestinationsCorp_20111220_S-1_EX-10.10_7346719_EX-10.10_Affiliate Agreement.pdf · page 26 · characters 83680-84561
+    starts: "(b) During the Term and for a period of twelve (12) months ..."
+    check: found on page 26 only (ok)
+
+16. [Q10m] rank 2: "restriction on a party competing with the counterparty in a geography or business sector"
+    TubeMediaCorp_20060310_8-K_EX-10.1_513921_EX-10.1_Affiliate Agreement.pdf · page 15 · characters 50776-51609
+    starts: "(c) Governing Law. The obligations of Affiliate and Network under this Agreement ..."
+    check: found on page 15 only (ok)
+
+17. [Q10p] rank 3: "must not set up a rival firm in the same territory or market as the other side"
+    TubeMediaCorp_20060310_8-K_EX-10.1_513921_EX-10.1_Affiliate Agreement.pdf · page 12 · characters 38310-38919
+    starts: "(d) Affiliate and Network shall each indemnify, defend and forever hold harmless ..."
+    check: found on page 12 only (ok)
+
+18. [Q11m] rank 2: "requirement on a party not to disparage the counterparty"
+    DigitalCinemaDestinationsCorp_20111220_S-1_EX-10.10_7346719_EX-10.10_Affiliate Agreement.pdf · page 14 · characters 43258-43801
+    starts: "Party. The parties agree that this exclusive remedy is essential to the ..."
+    check: found on page 14 only (ok)
+
+19. [Q11p] rank 5: "must not say negative things that damage the other company's reputation"
+    SteelVaultCorp_20081224_10-K_EX-10.16_3074935_EX-10.16_Affiliate Agreement.pdf · page 4 · characters 13473-14418
+    starts: "11. Liability. MARKETING AFFILIATE ACKNOWLEDGES AND AGREES THAT ANY PRODUCT, SERVICE, LICENSE ..."
+    check: found on page 4 only (ok)
+
+20. [Q12m] rank 9: "limit on the ability to transfer the license to a third party"
+    DigitalCinemaDestinationsCorp_20111220_S-1_EX-10.10_7346719_EX-10.10_Affiliate Agreement.pdf · page 13 · characters 38077-39111
+    starts: "Section 3.12 License. NCM hereby grants to Network Affiliate at no cost ..."
+    check: found on page 13 only (ok)
+
