@@ -157,7 +157,7 @@ qorfinder --model all-MiniLM-L6-v2-ft-cuad --index-dir data/eval-ft eval --reind
 ```
 
 Training checkpoints every epoch, and the same command resumes from the
-newest checkpoint; `scripts/smoke_test_finetune.py` checks that in a minute.
+newest checkpoint.
 The run and its scores are in `results/finetune-minilm/`.
 
 ## Develop
