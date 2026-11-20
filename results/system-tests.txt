@@ -8,6 +8,21 @@ commit:   release zip qorfinder-v0.0.0-windows-x86_64.zip (tag v0.0.0 = 13625c1)
 machine:  Lenovo ThinkPad T590 (testing machine), Windows 10 Pro 22H2 (build 19045)
 commands: qorfinder --index-dir <tmp> index data/t1-mixed
 
+data/t1-mixed is rebuilt by `python3 scripts/prepare_system_tests.py` from CUAD_v1.zip and data/fixtures/:
+- the 10 PDF and 10 TXT below, copied unchanged from CUAD_v1/full_contract_pdf/ and full_contract_txt/;
+  Cybergy... Affiliate Agreement is there as both PDF and TXT on purpose: the next section shows its
+  governing-law clause at ranks 2 and 3 with the same score (0.606) from both extractors;
+- 9 DOCX: the CUAD TXT of the same name, one paragraph per line;
+- corrupt.pdf: the first 4000 bytes of CreditcardscomInc_..._Affiliate Agreement.pdf;
+- over-50mb.txt: "This line pads the file past the fifty megabyte limit." 972,316 times with CRLF endings;
+- encrypted.pdf (LibreOffice PDF export with an open password), scanned.pdf (one page that is only an image)
+  and fees.xlsx (a small LibreOffice spreadsheet), made by hand and committed in data/fixtures/.
+The v0.0.0 run below differs from the rebuilt folder in two ways. Its DOCX were converted by LibreOffice 26.8
+on Windows (same text, except that it read the "§" of ADAPTIMMUNE... as "Â§"), and it also held
+ADUROBIOTECH...CONSULTING AGREEMENT(1).docx, a byte-identical copy, since dropped. So it counts 30 documents
+and 2029 chunks; `qorfinder index --dry-run` on the rebuilt folder counts 29 and 2011, with the same chunks
+for every other file (ADAPTIMMUNE's after the "§" one character earlier) and the same five skips.
+
 folder: data/t1-mixed = 10 CUAD PDF, 10 DOCX (CUAD TXT converted by LibreOffice), 10 CUAD TXT, plus corrupt.pdf (first 4000 bytes of a CUAD PDF), encrypted.pdf (LibreOffice export with an open password), scanned.pdf (image-only page), over-50mb.txt (54,449,696 bytes), fees.xlsx
 
 109658	2ThemartComInc_19990826_10-12G_EX-10.10_6700288_EX-10.10_Co-Branding Agreement_ Agency Agreement.pdf
@@ -173,6 +188,19 @@ measures: that a rebuild picks up added, changed and deleted files
 commit:   release zip qorfinder-v0.0.0-windows-x86_64.zip (tag v0.0.0 = 13625c1), run as unpacked
 machine:  Lenovo ThinkPad T590 (testing machine), Windows 10 Pro 22H2 (build 19045)
 commands: qorfinder index data/t7-change; qorfinder search ... (before and after each change)
+
+`python3 scripts/prepare_system_tests.py` writes data/t7-change in its state before the change:
+A-collaboration.txt = CARDAX,INC_08_19_2014-EX-10.1-COLLABORATION AGREEMENT.txt,
+B-consulting.txt = CORALGOLDRESOURCES,LTD_05_28_2020-EX-4.1-CONSULTING AGREEMENT.txt,
+C-development.txt = CnsPharmaceuticalsInc_20200326_8-K_EX-10.1_12079626_EX-10.1_Development Agreement.txt.
+The changes were then made by hand, in a Windows editor that saved B-consulting.txt with CRLF endings:
+step 2: add D-new.txt holding the line
+          ADDENDUM. The Licensee shall plant one olive tree for every hundred units sold under this Agreement.
+        append an empty line and
+          12. REPORTS. The Consultant shall deliver every written report to the Company by registered courier in a sealed envelope.
+        to B-consulting.txt, and delete C-development.txt;
+step 4: in clause 20.1 of B-consulting.txt replace
+          "by pre-paid registered mail, by facsimile transmission or electronic mail" with "only by carrier pigeon".
 
 folder: data/t7-change, three CUAD TXT files copied as A-collaboration.txt, B-consulting.txt, C-development.txt
 

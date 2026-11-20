@@ -4,6 +4,8 @@
 /data/eval-ft
 /data/full-index*
 /data/finetune
+/data/t1-mixed
+/data/t7-change
 /models
 /doc
 # fine-tuning outputs: the weights and raw logs stay local

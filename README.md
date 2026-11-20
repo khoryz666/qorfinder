@@ -119,8 +119,10 @@ and copies them to `data/cuad/sample/`, prints how many contain each clause
 category, keeps the categories found in at most 15% of them, and writes
 `docs.txt`, `categories.tsv` and `spans.tsv` to `data/testset/`. The
 evaluation indexes `data/cuad/sample/` only, since the spans cover the
-sample alone; the full
-`data/cuad/txt/` is for the timing run.
+sample alone; the full `data/cuad/txt/` is for the timing run.
+`python3 scripts/prepare_system_tests.py` builds the folders the system
+tests index (`data/t1-mixed/`, `data/t7-change/`) from the same zip and
+`data/fixtures/`; `results/system-tests.txt` says what each holds.
 
 The queries in `data/testset/queries.jsonl` are written before the first
 run and then frozen. To score:
