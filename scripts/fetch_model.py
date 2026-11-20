@@ -1,18 +1,21 @@
 #!/usr/bin/env python3
-"""Download an embedding model into models/ once.
+"""Download every embedding model into models/ once.
 
 QorFinder never touches the network itself (NFR1). Run this script once on
 a connected machine; afterwards indexing and search work offline. Each
 model's files are pinned to one Hugging Face revision and checked against
 their SHA-256, so every machine embeds with exactly the same weights. The
-models are those in crates/qf-core/src/embed/models.rs; the default is
-QorFinder's default model.
+models are those in crates/qf-core/src/embed/models.rs (about 1.4 GB in
+all); files already present are only checked.
 
-Usage: python3 scripts/fetch_model.py [--model ID] [--out models]
+Usage: python3 scripts/fetch_model.py
+
+Set QF_MODELS to a comma-separated list of short names (minilm, mpnet, bge,
+e5) to fetch only those; CI sets QF_MODELS=minilm.
 """
 
-import argparse
 import hashlib
+import os
 import sys
 import urllib.request
 from pathlib import Path
@@ -52,7 +55,14 @@ MODELS = {
         },
     ),
 }
-DEFAULT_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+# QF_MODELS short name -> model id
+SHORT_NAMES = {
+    "minilm": "sentence-transformers/all-MiniLM-L6-v2",
+    "mpnet": "sentence-transformers/all-mpnet-base-v2",
+    "bge": "BAAI/bge-base-en-v1.5",
+    "e5": "intfloat/e5-base-v2",
+}
+MODELS_DIR = Path(__file__).resolve().parent.parent / "models"
 
 
 def sha256(path: Path) -> str:
@@ -73,26 +83,31 @@ def fetch(repo: str, revision: str, name: str, dest: Path) -> None:
     tmp.replace(dest)
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--model", choices=MODELS, default=DEFAULT_MODEL)
-    parser.add_argument("--out", type=Path, default=Path("models"))
-    args = parser.parse_args()
-
-    revision, files = MODELS[args.model]
+def fetch_model(model_id: str) -> bool:
+    """Fetch the files of one model that are missing and check them all."""
+    revision, files = MODELS[model_id]
     # models/<name>, as qorfinder looks for it.
-    model_dir = args.out / args.model.split("/")[-1]
+    model_dir = MODELS_DIR / model_id.split("/")[-1]
     model_dir.mkdir(parents=True, exist_ok=True)
     for name, expected in files.items():
         dest = model_dir / name
         if not dest.exists():
-            fetch(args.model, revision, name, dest)
+            fetch(model_id, revision, name, dest)
         actual = sha256(dest)
         if actual != expected:
             print(f"{dest}: sha256 {actual}, expected {expected}", file=sys.stderr)
-            return 1
+            return False
         print(f"ok {dest} {actual}")
-    return 0
+    return True
+
+
+def main() -> int:
+    names = os.environ.get("QF_MODELS", ",".join(SHORT_NAMES)).split(",")
+    unknown = [n for n in names if n not in SHORT_NAMES]
+    if unknown:
+        print(f"QF_MODELS: unknown {unknown}; known {list(SHORT_NAMES)}", file=sys.stderr)
+        return 1
+    return 0 if all([fetch_model(SHORT_NAMES[n]) for n in names]) else 1
 
 
 if __name__ == "__main__":

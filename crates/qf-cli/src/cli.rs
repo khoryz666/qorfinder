@@ -390,10 +390,9 @@ fn dry_run_index(folder: &Path, model_files: &ModelFiles, config: ChunkConfig) -
 pub(crate) fn load_embedder(model_files: &ModelFiles) -> Result<Embedder> {
     Embedder::load(model_files.model, &model_files.dir).with_context(|| {
         format!(
-            "cannot load {} from {} (run scripts/fetch_model.py --model {} once to download it)",
+            "cannot load {} from {} (run scripts/fetch_model.py once to download it)",
             model_files.model.id,
             model_files.dir.display(),
-            model_files.model.id,
         )
     })
 }
@@ -404,9 +403,8 @@ pub(crate) fn load_tokenizer(model_files: &ModelFiles) -> Result<ModelTokenizer>
         .map_err(|e| anyhow::anyhow!(e))
         .with_context(|| {
             format!(
-                "cannot load {} (run scripts/fetch_model.py --model {} once to download the model)",
+                "cannot load {} (run scripts/fetch_model.py once to download the model)",
                 path.display(),
-                model_files.model.id,
             )
         })
 }

@@ -39,7 +39,9 @@ jobs:
         run: nix develop --ignore-environment --keep HOME --command cargo clippy --workspace --all-targets -- -D warnings
 
       - name: Fetch the model
-        run: nix develop --ignore-environment --keep HOME --command python3 scripts/fetch_model.py
+        run: nix develop --ignore-environment --keep HOME --keep QF_MODELS --command python3 scripts/fetch_model.py
+        env:
+          QF_MODELS: minilm
 
       # --include-ignored also runs the tests that load the model, among them
       # the check against sentence-transformers quoted in the report.
@@ -75,6 +77,8 @@ jobs:
 
       - name: Fetch the model
         run: python scripts/fetch_model.py
+        env:
+          QF_MODELS: minilm
 
       - name: Test
         run: cargo test --workspace -- --include-ignored

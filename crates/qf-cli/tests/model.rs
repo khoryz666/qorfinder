@@ -48,7 +48,7 @@ fn model_folder_comes_from_the_model_id() {
         "{stderr}"
     );
     assert!(
-        stderr.contains("fetch_model.py --model intfloat/e5-base-v2"),
+        stderr.contains("run scripts/fetch_model.py once"),
         "{stderr}"
     );
 }

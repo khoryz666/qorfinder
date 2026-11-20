@@ -28,6 +28,8 @@ jobs:
 
       - name: Fetch the model
         run: python3 scripts/fetch_model.py
+        env:
+          QF_MODELS: minilm
 
       - uses: actions/setup-node@v4
         with:
@@ -78,6 +80,8 @@ jobs:
 
       - name: Fetch the model
         run: python scripts/fetch_model.py
+        env:
+          QF_MODELS: minilm
 
       - uses: actions/setup-node@v4
         with:

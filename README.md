@@ -11,7 +11,8 @@ It is one Rust library (`qf-core`) with a command-line front end
 ## Quick start
 
 ```bash
-# 1. Download the embedding model once (about 90 MB, pinned revision)
+# 1. Download the embedding models once (about 1.4 GB, pinned revisions;
+#    QF_MODELS=minilm fetches only the default, about 90 MB)
 python3 scripts/fetch_model.py
 
 # 2. Build (the UI once, then the program)
@@ -68,7 +69,6 @@ Each supported model is one entry in `crates/qf-core/src/embed/models.rs`
 | `all-MiniLM-L6-v2-ft-cuad`                         | BERT, 6 layers   | 384  | mean        | none (trained here, see [Fine-tuning](#fine-tuning))               |
 
 ```bash
-python3 scripts/fetch_model.py --model intfloat/e5-base-v2
 qorfinder --model intfloat/e5-base-v2 --index-dir data/eval-e5 eval --out results/e5
 ```
 
