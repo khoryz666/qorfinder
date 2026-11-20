@@ -1,0 +1,73 @@
+How fast and how heavy QorFinder is: indexing time and peak memory, index size, query latency.
+timing.csv holds every query's encode, scan and total time (median of 5 runs) for each run below.
+
+==============================================================================
+Full index of all 510 CUAD contracts on the testing machine
+measures: index time, peak memory, index size; query latency over 39,307 chunks
+commit:   540a865 (release build, cargo build --release, rustc 1.96.0); embeds 4 batches at a time as in 1637c07
+machine:  Lenovo ThinkPad T590 (testing machine), Intel Core i5-8365U (4 cores, 8 threads), 16 GB RAM, Windows 10 Pro 22H2 (build 19045)
+commands: qorfinder --index-dir data/full-index-t590 index data/cuad/txt
+          qorfinder --index-dir data/full-index-t590 eval --timing --out results/2026-11-17-540a865-t590
+
+qorfinder --index-dir data/full-index-t590 index data/cuad/txt
+indexed 510 document(s), 39307 chunk(s), 0 skipped, in 3491.2 s (prepare 13.6 s, embed 3477.3 s, 11.3 chunks/s)
+index saved to data/full-index-t590
+peak memory 1709.5 MB
+wall clock: 3492 s
+
+index size: 93.0 MB (93045248 bytes)
+source size: 26.8 MB (26820468 bytes)
+
+qorfinder --index-dir data/full-index-t590 eval --timing --out results/2026-11-17-540a865-t590
+34 queries over 39307 chunks, median of 5 runs each
+ total: median 31.5 ms, p95 39.6 ms
+encode: median 13.7 ms, p95 16.5 ms
+  scan: median 17.9 ms, p95 22.9 ms
+peak memory 214.9 MB
+
+==============================================================================
+Full index of all 510 CUAD contracts on the dev machine
+measures: as above, on the dev machine
+commit:   1637c07 (embeds 4 batches at a time)
+machine:  Lenovo ThinkPad E14 Gen 3, AMD Ryzen 7 5700U (8 cores, 16 threads), 16 GB RAM, Linux Mint 22.3 (dev machine)
+commands: /usr/bin/time -v qorfinder --index-dir data/full-index index data/cuad/txt
+          qorfinder --index-dir data/full-index eval --timing --out results/2026-11-02-1637c07-dev
+
+indexed 510 document(s), 39307 chunk(s), 0 skipped, in 1929.1 s (prepare 1.1 s, embed 1927.9 s, 20.4 chunks/s)
+index saved to data/full-index
+peak memory 2245.6 MB
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 32:09.43
+	Maximum resident set size (kbytes): 2299516
+
+index size: 93.0 MB
+source size: 26.8 MB
+
+34 queries over 39307 chunks, median of 5 runs each
+ total: median 45.6 ms, p95 49.1 ms
+encode: median 33.0 ms, p95 36.3 ms
+  scan: median 12.5 ms, p95 12.8 ms
+wrote results/2026-11-02-1637c07-dev/timing.csv
+peak memory 219.3 MB
+
+==============================================================================
+Per-model latency and memory on the 30-contract eval index
+measures: index size, eval peak memory and wall time, query latency for each model
+commit:   6992466 (base models), 20662e2 (fine-tuned)
+machine:  Lenovo ThinkPad E14 Gen 3, AMD Ryzen 7 5700U (8 cores, 16 threads), 16 GB RAM, Linux Mint 22.3 (dev machine)
+commands: /usr/bin/time -v qorfinder --model ID --index-dir data/eval-NAME eval --reindex
+          qorfinder --model ID --index-dir data/eval-NAME eval --timing
+
+Efficiency on the dev machine (Ryzen 7 5700U, 16 GB), 30-contract eval index (1686 chunks), release build.
+Eval peak RSS and wall time from /usr/bin/time -v around eval --reindex; query timing from eval --timing (34 queries x 5):
+model               dim  index   eval peak RSS  query median / p95 (encode)       timing peak
+all-MiniLM-L6-v2    384  4.0 MB  1.42 GB        36.4 / 40.3 ms  (35.8 ms)          188 MB
+all-mpnet-base-v2   768  6.4 MB  2.51 GB        122.4 / 136.0 ms (121.3 ms)        848 MB
+bge-base-en-v1.5    768  6.4 MB  2.11 GB        139.0 / 159.1 ms (137.9 ms)        847 MB
+e5-base-v2          768  6.4 MB  2.09 GB        124.7 / 141.7 ms (123.6 ms)        847 MB
+Eval-index wall time (index 30 contracts + all queries): MiniLM 1:10, MPNet 5:45, BGE 6:08, E5 6:26.
+Not measured: the 510-contract full index for the base models (MiniLM took 32 min there; a base model
+would take several hours). The scan grows with chunks x dimension: 12.5 ms over 39,307 MiniLM chunks, so
+about 25 ms for a 768-dim model (an estimate), keeping a query well under 1 s.
+
+all-MiniLM-L6-v2-ft-cuad: Efficiency on the dev machine (Ryzen 7 5700U, 16 GB, release build), same as the base model:
+index 4.0 MB; query median 33.5 ms, p95 36.3 ms (timing.csv); timing peak 188.5 MB.
