@@ -178,8 +178,15 @@ cargo test -- --include-ignored   # also the tests that load models/
 ```
 
 Every tool comes from the locked flake, so any machine with Nix (flakes
-enabled) gets the same environment with no other setup. Regenerating the
-reference embeddings needs sentence-transformers and PyTorch, which live in a
+enabled) gets the same environment with no other setup. On Windows without
+Nix, `tools/setup-windows.ps1` installs the same tools natively (MSVC build
+tools, the pinned Rust, Node.js, Python and Git):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\tools\setup-windows.ps1 -SkipDocs -WithScoring -Build
+```
+
+Regenerating the reference embeddings needs sentence-transformers and PyTorch, which live in a
 separate shell. It writes one file for every model in `models/` to
 `crates/qf-core/tests/fixtures/reference/`; the test checks each fetched model
 against it and skips the others:
