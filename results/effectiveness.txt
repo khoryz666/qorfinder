@@ -1,0 +1,236 @@
+Retrieval quality of QorFinder on the frozen CUAD test set: 34 queries (17 wording-matched, 17 paraphrased)
+over 30 contracts (seed 2026), chunks 200/40, RRF kappa = 5, scored by scripts/score.py (ranx; Wilcoxon
+signed-rank from SciPy). per_query.csv holds every query's scores. The TREC qrels and run files are not kept:
+`qorfinder eval` writes them to results/eval/ and regenerates them byte for byte (checked at 6992466).
+
+Test collection: 30 contracts, 17 clause categories, 92 annotated spans (data/testset/), 1686 chunks.
+Chunk length 156.3 tokens on average (median 183, maximum 201), counted with the all-MiniLM-L6-v2
+tokenizer without special tokens over the chunk texts of data/eval-index.
+
+==============================================================================
+sentence-transformers/all-MiniLM-L6-v2 (default): BM25, semantic and hybrid
+measures: nDCG@10, MRR@10 and R-Precision per method and query group; Wilcoxon p on per-query nDCG@10
+commit:   4f04c13 (RRF kappa = 5); rerun at 6992466 gave byte-identical qrels and runs
+machine:  Lenovo ThinkPad E14 Gen 3, AMD Ryzen 7 5700U (8 cores, 16 threads), 16 GB RAM, Linux Mint 22.3 (dev machine)
+commands: qorfinder --index-dir data/eval-index eval --reindex
+          python3 scripts/score.py
+
+matched queries (17)
+  method          ndcg@10       mrr@10  r-precision
+  bm25             0.3227       0.4289       0.2800
+  semantic         0.2068       0.3515       0.1134
+  hybrid           0.3185       0.4162       0.2365
+  Wilcoxon signed-rank on nDCG@10, two-sided p:
+    semantic vs bm25: 0.4326 (14 differing queries)
+    hybrid vs bm25: 0.6949 (12 differing queries)
+    hybrid vs semantic: 0.1330 (13 differing queries)
+
+paraphrased queries (17)
+  method          ndcg@10       mrr@10  r-precision
+  bm25             0.1055       0.1353       0.0784
+  semantic         0.1306       0.2059       0.0776
+  hybrid           0.1517       0.1814       0.0874
+  Wilcoxon signed-rank on nDCG@10, two-sided p:
+    semantic vs bm25: 0.9165 (6 differing queries)
+    hybrid vs bm25: 0.3452 (5 differing queries)
+    hybrid vs semantic: 0.7532 (6 differing queries)
+
+all queries (34)
+  method          ndcg@10       mrr@10  r-precision
+  bm25             0.2141       0.2821       0.1792
+  semantic         0.1687       0.2787       0.0955
+  hybrid           0.2351       0.2988       0.1620
+  Wilcoxon signed-rank on nDCG@10, two-sided p:
+    semantic vs bm25: 0.7228 (20 differing queries)
+    hybrid vs bm25: 0.3318 (17 differing queries)
+    hybrid vs semantic: 0.2273 (19 differing queries)
+
+==============================================================================
+sentence-transformers/all-mpnet-base-v2: BM25, semantic and hybrid
+measures: nDCG@10, MRR@10 and R-Precision per method and query group; Wilcoxon p on per-query nDCG@10
+commit:   6992466 (RRF kappa = 5)
+machine:  Lenovo ThinkPad E14 Gen 3, AMD Ryzen 7 5700U (8 cores, 16 threads), 16 GB RAM, Linux Mint 22.3 (dev machine)
+commands: qorfinder --model sentence-transformers/all-mpnet-base-v2 --index-dir data/eval-mpnet eval --reindex
+          python3 scripts/score.py
+
+matched queries (17)
+  method          ndcg@10       mrr@10  r-precision
+  bm25             0.3227       0.4289       0.2800
+  semantic         0.2709       0.4902       0.1807
+  hybrid           0.3746       0.5069       0.2856
+  Wilcoxon signed-rank on nDCG@10, two-sided p:
+    semantic vs bm25: 0.9721 (13 differing queries)
+    hybrid vs bm25: 0.1079 (13 differing queries)
+    hybrid vs semantic: 0.1005 (13 differing queries)
+
+paraphrased queries (17)
+  method          ndcg@10       mrr@10  r-precision
+  bm25             0.1055       0.1353       0.0784
+  semantic         0.1932       0.2584       0.1395
+  hybrid           0.2278       0.2912       0.1796
+  Wilcoxon signed-rank on nDCG@10, two-sided p:
+    semantic vs bm25: 0.4008 (8 differing queries)
+    hybrid vs bm25: 0.0431 (5 differing queries)
+    hybrid vs semantic: 0.6744 (8 differing queries)
+
+all queries (34)
+  method          ndcg@10       mrr@10  r-precision
+  bm25             0.2141       0.2821       0.1792
+  semantic         0.2320       0.3743       0.1601
+  hybrid           0.3012       0.3990       0.2326
+  Wilcoxon signed-rank on nDCG@10, two-sided p:
+    semantic vs bm25: 0.5545 (21 differing queries)
+    hybrid vs bm25: 0.0102 (18 differing queries)
+    hybrid vs semantic: 0.3944 (21 differing queries)
+
+==============================================================================
+BAAI/bge-base-en-v1.5: BM25, semantic and hybrid
+measures: nDCG@10, MRR@10 and R-Precision per method and query group; Wilcoxon p on per-query nDCG@10
+commit:   6992466 (RRF kappa = 5)
+machine:  Lenovo ThinkPad E14 Gen 3, AMD Ryzen 7 5700U (8 cores, 16 threads), 16 GB RAM, Linux Mint 22.3 (dev machine)
+commands: qorfinder --model BAAI/bge-base-en-v1.5 --index-dir data/eval-bge eval --reindex
+          python3 scripts/score.py
+
+matched queries (17)
+  method          ndcg@10       mrr@10  r-precision
+  bm25             0.3227       0.4289       0.2800
+  semantic         0.2121       0.3613       0.1617
+  hybrid           0.3211       0.4231       0.2371
+  Wilcoxon signed-rank on nDCG@10, two-sided p:
+    semantic vs bm25: 0.1730 (13 differing queries)
+    hybrid vs bm25: 0.8068 (13 differing queries)
+    hybrid vs semantic: 0.1330 (13 differing queries)
+
+paraphrased queries (17)
+  method          ndcg@10       mrr@10  r-precision
+  bm25             0.1055       0.1353       0.0784
+  semantic         0.1338       0.2039       0.0779
+  hybrid           0.1714       0.2412       0.1017
+  Wilcoxon signed-rank on nDCG@10, two-sided p:
+    semantic vs bm25: 0.3743 (9 differing queries)
+    hybrid vs bm25: 0.1763 (7 differing queries)
+    hybrid vs semantic: 0.6744 (8 differing queries)
+
+all queries (34)
+  method          ndcg@10       mrr@10  r-precision
+  bm25             0.2141       0.2821       0.1792
+  semantic         0.1730       0.2826       0.1198
+  hybrid           0.2463       0.3321       0.1694
+  Wilcoxon signed-rank on nDCG@10, two-sided p:
+    semantic vs bm25: 0.7210 (22 differing queries)
+    hybrid vs bm25: 0.2322 (20 differing queries)
+    hybrid vs semantic: 0.1924 (21 differing queries)
+
+==============================================================================
+intfloat/e5-base-v2: BM25, semantic and hybrid
+measures: nDCG@10, MRR@10 and R-Precision per method and query group; Wilcoxon p on per-query nDCG@10
+commit:   6992466 (RRF kappa = 5)
+machine:  Lenovo ThinkPad E14 Gen 3, AMD Ryzen 7 5700U (8 cores, 16 threads), 16 GB RAM, Linux Mint 22.3 (dev machine)
+commands: qorfinder --model intfloat/e5-base-v2 --index-dir data/eval-e5 eval --reindex
+          python3 scripts/score.py
+
+matched queries (17)
+  method          ndcg@10       mrr@10  r-precision
+  bm25             0.3227       0.4289       0.2800
+  semantic         0.2060       0.2990       0.1761
+  hybrid           0.3327       0.4570       0.1849
+  Wilcoxon signed-rank on nDCG@10, two-sided p:
+    semantic vs bm25: 0.2213 (13 differing queries)
+    hybrid vs bm25: 0.8753 (12 differing queries)
+    hybrid vs semantic: 0.0409 (11 differing queries)
+
+paraphrased queries (17)
+  method          ndcg@10       mrr@10  r-precision
+  bm25             0.1055       0.1353       0.0784
+  semantic         0.1349       0.1985       0.0776
+  hybrid           0.1634       0.2181       0.0888
+  Wilcoxon signed-rank on nDCG@10, two-sided p:
+    semantic vs bm25: 0.5754 (8 differing queries)
+    hybrid vs bm25: 0.2489 (6 differing queries)
+    hybrid vs semantic: 0.8886 (8 differing queries)
+
+all queries (34)
+  method          ndcg@10       mrr@10  r-precision
+  bm25             0.2141       0.2821       0.1792
+  semantic         0.1705       0.2488       0.1269
+  hybrid           0.2481       0.3376       0.1369
+  Wilcoxon signed-rank on nDCG@10, two-sided p:
+    semantic vs bm25: 0.7022 (21 differing queries)
+    hybrid vs bm25: 0.3060 (18 differing queries)
+    hybrid vs semantic: 0.1074 (19 differing queries)
+
+==============================================================================
+all-MiniLM-L6-v2-ft-cuad: BM25, semantic and hybrid with the fine-tuned MiniLM
+measures: as above, with the model trained by scripts/finetune.py (tuning.txt has how)
+commit:   20662e2 (model.safetensors sha256 2a164e0ea9bbcb15e7476881eb403d264451063df834696b8e7869cff2848bf3)
+machine:  Lenovo ThinkPad E14 Gen 3, AMD Ryzen 7 5700U (8 cores, 16 threads), 16 GB RAM, Linux Mint 22.3 (dev machine)
+commands: qorfinder --model all-MiniLM-L6-v2-ft-cuad --index-dir data/eval-ft eval --reindex
+          python3 scripts/score.py
+
+matched queries (17)
+  method          ndcg@10       mrr@10  r-precision
+  bm25             0.3227       0.4289       0.2800
+  semantic         0.4472       0.5157       0.3613
+  hybrid           0.4170       0.5090       0.3484
+  Wilcoxon signed-rank on nDCG@10, two-sided p:
+    semantic vs bm25: 0.0640 (14 differing queries)
+    hybrid vs bm25: 0.0107 (13 differing queries)
+    hybrid vs semantic: 0.3627 (14 differing queries)
+
+paraphrased queries (17)
+  method          ndcg@10       mrr@10  r-precision
+  bm25             0.1055       0.1353       0.0784
+  semantic         0.3917       0.5172       0.3187
+  hybrid           0.2834       0.4020       0.2439
+  Wilcoxon signed-rank on nDCG@10, two-sided p:
+    semantic vs bm25: 0.0037 (12 differing queries)
+    hybrid vs bm25: 0.0099 (11 differing queries)
+    hybrid vs semantic: 0.0047 (12 differing queries)
+
+all queries (34)
+  method          ndcg@10       mrr@10  r-precision
+  bm25             0.2141       0.2821       0.1792
+  semantic         0.4194       0.5164       0.3400
+  hybrid           0.3502       0.4555       0.2961
+  Wilcoxon signed-rank on nDCG@10, two-sided p:
+    semantic vs bm25: 0.0005 (26 differing queries)
+    hybrid vs bm25: 0.0002 (24 differing queries)
+    hybrid vs semantic: 0.0086 (26 differing queries)
+
+==============================================================================
+Comparison of the models, and the cross-validated model choice
+measures: semantic and hybrid scores side by side; which model leave-one-category-out cross-validation picks
+commit:   6992466 (base models), 20662e2 (fine-tuned)
+machine:  Lenovo ThinkPad E14 Gen 3, AMD Ryzen 7 5700U (8 cores, 16 threads), 16 GB RAM, Linux Mint 22.3 (dev machine)
+commands: the runs above; the cross-validation reads the columns of per_query.csv
+
+BM25 is identical for every model (BGE and E5 share MiniLM's vocabulary; MPNet's differs but gives the same
+1686 chunks): matched 0.3227, paraphrased 0.1055, all 0.2141 nDCG@10.
+Every model's Rust embeddings match Python sentence-transformers at cosine 1.000000 on chunks and queries
+(crates/qf-core/tests/fixtures/reference/).
+
+model               sem nDCG@10 m/p/all       sem MRR@10 m/p/all        hybrid all  matched gap to BM25
+all-MiniLM-L6-v2    0.2068 0.1306 0.1687   0.3515 0.2059 0.2787   0.2351      0.1160  not met
+all-mpnet-base-v2   0.2709 0.1932 0.2320   0.4902 0.2584 0.3743   0.3012      0.0518  not met
+bge-base-en-v1.5    0.2121 0.1338 0.1730   0.3613 0.2039 0.2826   0.2463      0.1106  not met
+e5-base-v2          0.2060 0.1349 0.1705   0.2990 0.1985 0.2488   0.2481      0.1167  not met
+
+nDCG@10 (MRR@10)      matched          paraphrased      all
+bm25                  0.3227 (0.4289)  0.1055 (0.1353)  0.2141 (0.2821)
+semantic, base        0.2068 (0.3515)  0.1306 (0.2059)  0.1687 (0.2787)
+semantic, fine-tuned  0.4472 (0.5157)  0.3917 (0.5172)  0.4194 (0.5164)
+hybrid, fine-tuned    0.4170 (0.5090)  0.2834 (0.4020)  0.3502 (0.4555)
+Wilcoxon, fine-tuned semantic vs bm25: matched p = 0.064, paraphrased p = 0.0037, all p = 0.0005;
+hybrid vs fine-tuned semantic: all p = 0.0086 (the hybrid is lower).
+
+Leave-one-category-out cross-validation: each category's matched and paraphrased queries are held out
+together, the setting with the best mean score on the other 16 categories is chosen and scored on the
+held-out pair (ties to the setting listed first), so no query is scored with a setting chosen on it.
+Over the four base models:
+CV semantic_ndcg@10 matched 0.2709, paraphrased 0.1932, all 0.2320; chosen: mpnet in 17 of 17 folds
+CV hybrid_ndcg@10   matched 0.3746, paraphrased 0.2278, all 0.3012; chosen: mpnet in 17 of 17 folds
+CV semantic_mrr@10  matched 0.4902, paraphrased 0.2584, all 0.3743; chosen: mpnet in 17 of 17 folds
+
+Over the five models (the four above and the fine-tuned MiniLM):
+CV semantic_ndcg@10 matched 0.4472, paraphrased 0.3917, all 0.4194; chosen: ft-minilm in 17 of 17 folds
+CV hybrid_ndcg@10   matched 0.4170, paraphrased 0.2835, all 0.3502; chosen: ft-minilm in 17 of 17 folds
