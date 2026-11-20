@@ -140,25 +140,22 @@ runs by leave-one-category-out cross-validation.
 `all-MiniLM-L6-v2-ft-cuad` is all-MiniLM-L6-v2 fine-tuned on the annotated
 clauses of the 480 CUAD contracts outside the test sample, for the test
 set's 17 categories. The training queries are three hand-written paraphrases
-per category; the scripts refuse to run if any shares a three-word phrase
+per category; the script refuses to run if any shares a three-word phrase
 with a test query. Training needs PyTorch, so it runs in the reference shell,
-on the CPU (about half an hour on the dev machine):
+on the CPU (the training step took 30 minutes on the dev machine):
 
 ```bash
-nix develop .#reference   # PyTorch and transformers
-python3 scripts/check_templates.py    # each query is closest to its own category
-python3 scripts/tune_hyperparams.py   # learning rate by validation loss
-python3 scripts/finetune_minilm.py --save-best --learning-rate <the best one>
-mkdir -p models/all-MiniLM-L6-v2-ft-cuad
-cp results/finetune-minilm/model-best/* models/all-MiniLM-L6-v2-ft-cuad/
-python3 scripts/reference_embeddings.py
-exit
-qorfinder --model all-MiniLM-L6-v2-ft-cuad --index-dir data/eval-ft eval --reindex --out results/finetune-minilm/eval
+nix develop .#reference --command python3 scripts/finetune.py
+qorfinder --model all-MiniLM-L6-v2-ft-cuad --index-dir data/eval-ft eval --reindex
 ```
 
-Training checkpoints every epoch, and the same command resumes from the
-newest checkpoint.
-The run and its scores are in `results/finetune-minilm/`.
+`finetune.py` checks that each training query is closest to its own
+category under the base model, picks the learning rate by validation loss,
+trains, copies the epoch with the lowest validation loss to
+`models/all-MiniLM-L6-v2-ft-cuad/` and writes its reference embeddings. Its
+log and checkpoints go to `data/finetune/`; it checkpoints every epoch, and
+the same command resumes from the newest checkpoint. The recorded run and its
+scores are in `results/finetune-minilm/`.
 
 ## Develop
 

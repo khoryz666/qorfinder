@@ -74,7 +74,7 @@ pub const MODELS: &[Model] = &[
         passage_prefix: "",
     },
     // MiniLM fine-tuned on the clauses of the CUAD contracts outside the test
-    // sample (scripts/finetune_minilm.py). It is trained locally, not fetched
+    // sample (scripts/finetune.py). It is trained locally, not fetched
     // from Hugging Face, so scripts/fetch_model.py has no entry for it. Same
     // architecture, size and pooling as the base, so candle loads it as is.
     // The weights are the lowest-validation-loss epoch, pinned in the embed test.

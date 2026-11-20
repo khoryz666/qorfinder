@@ -54,7 +54,7 @@ fn loads_minilm() {
 }
 
 #[test]
-#[ignore = "needs the fine-tuned model from scripts/finetune_minilm.py"]
+#[ignore = "needs the fine-tuned model from scripts/finetune.py"]
 fn loads_finetuned_minilm() {
     let model = Model::find("all-MiniLM-L6-v2-ft-cuad").unwrap();
     let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))

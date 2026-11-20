@@ -9,7 +9,7 @@ settings in crates/qf-core/src/embed/models.rs against the ones recorded
 here. Needs sentence-transformers and the network once; QorFinder itself
 needs neither.
 
-The fine-tuned MiniLM (all-MiniLM-L6-v2-ft-cuad, from scripts/finetune_minilm.py)
+The fine-tuned MiniLM (all-MiniLM-L6-v2-ft-cuad, from scripts/finetune.py)
 is a bare BERT transformer with no sentence-transformers pooling module, so
 it is embedded in plain transformers with QorFinder's own mean-pool and
 unit-normalise instead. Models missing from models/ are skipped.

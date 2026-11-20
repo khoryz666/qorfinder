@@ -3,6 +3,7 @@
 /data/eval-index*
 /data/eval-ft
 /data/full-index*
+/data/finetune
 /models
 /doc
 # fine-tuning outputs: the weights and raw logs stay local
