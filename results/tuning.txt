@@ -1,0 +1,152 @@
+How QorFinder's settings were chosen, on the frozen CUAD test set (34 queries over 30 contracts, seed 2026).
+A setting is judged by leave-one-category-out cross-validation, not by its score on all queries
+(effectiveness.txt describes it).
+
+==============================================================================
+Chunk size
+measures: nDCG@10 of BM25, semantic and hybrid for six chunk sizes (max tokens / overlap)
+commit:   4f04c13 (RRF kappa = 5), all-MiniLM-L6-v2
+machine:  Lenovo ThinkPad E14 Gen 3, AMD Ryzen 7 5700U (8 cores, 16 threads), 16 GB RAM, Linux Mint 22.3 (dev machine)
+commands: for s in 128:16 160:32 200:20 200:40 256:40 300:60; do
+            qorfinder --index-dir data/eval-index eval --reindex --max-tokens ${s%:*} --overlap ${s#*:}
+            python3 scripts/score.py
+          done
+
+Each setting re-indexes the 30 sampled contracts and re-judges relevance at span level.
+
+max/overlap  chunks  relevant  method    matched  paraphrased  all   (nDCG@10)
+128/16         2545       188  bm25        0.2001   0.0493   0.1247
+128/16         2545       188  semantic    0.1514   0.0852   0.1183
+128/16         2545       188  hybrid      0.2028   0.0732   0.1380
+160/32         2094       166  bm25        0.2831   0.0702   0.1766
+160/32         2094       166  semantic    0.1942   0.1021   0.1482
+160/32         2094       166  hybrid      0.2683   0.1067   0.1875
+200/20         1626       150  bm25        0.3225   0.1036   0.2131
+200/20         1626       150  semantic    0.2284   0.1131   0.1708
+200/20         1626       150  hybrid      0.3229   0.1297   0.2263
+200/40         1686       152  bm25        0.3227   0.1055   0.2141
+200/40         1686       152  semantic    0.2068   0.1306   0.1687
+200/40         1686       152  hybrid      0.3185   0.1517   0.2351
+256/40         1294       128  bm25        0.3285   0.0935   0.2110
+256/40         1294       128  semantic    0.2320   0.0919   0.1620
+256/40         1294       128  hybrid      0.3294   0.1218   0.2256
+300/60         1123       132  bm25        0.3365   0.1311   0.2338
+300/60         1123       132  semantic    0.2263   0.1468   0.1866
+300/60         1123       132  hybrid      0.3010   0.1803   0.2407
+
+Leave-one-category-out cross-validation over the six settings:
+CV bm25_ndcg@10 matched      0.2957
+CV bm25_ndcg@10 paraphrased  0.1311
+CV bm25_ndcg@10 all          0.2134
+chosen: 300/60 in 16 of 17 folds, 200/40 in 1 of 17 folds
+CV semantic_ndcg@10 matched      0.2263
+CV semantic_ndcg@10 paraphrased  0.1468
+CV semantic_ndcg@10 all          0.1866
+chosen: 300/60 in 17 of 17 folds
+CV hybrid_ndcg@10 matched      0.2460
+CV hybrid_ndcg@10 paraphrased  0.1348
+CV hybrid_ndcg@10 all          0.1904
+chosen: 300/60 in 12 of 17 folds, 200/40 in 4 of 17 folds, 256/40 in 1 of 17 folds
+
+==============================================================================
+RRF constant kappa, base MiniLM
+measures: hybrid scores (all queries) for nine values of kappa; the cross-validated choice
+commit:   5ec87dd (adds --kappa) to 9d9e14b; kappa = 5 fixed as the default at 4f04c13; all-MiniLM-L6-v2
+machine:  Lenovo ThinkPad E14 Gen 3, AMD Ryzen 7 5700U (8 cores, 16 threads), 16 GB RAM, Linux Mint 22.3 (dev machine)
+commands: for k in 1 2 5 10 20 30 60 100 200; do
+            qorfinder --index-dir data/eval-index eval --kappa $k
+            python3 scripts/score.py
+          done
+
+kappa    ndcg@10   mrr@10  r-precision
+1         0.2339   0.3257       0.1666
+2         0.2307   0.3110       0.1678
+5         0.2351   0.2988       0.1620
+10        0.2301   0.2917       0.1752
+20        0.2117   0.2610       0.1298
+30        0.2016   0.2525       0.1072
+60        0.1835   0.2545       0.1095
+100       0.1747   0.2358       0.1118
+200       0.1589   0.2297       0.1140
+
+Leave-one-category-out cross-validation:
+CV hybrid_ndcg@10 matched      0.3080
+CV hybrid_ndcg@10 paraphrased  0.1477
+CV hybrid_ndcg@10 all          0.2278
+chosen: 5 in 15 of 17 folds, 1 in 2 of 17 folds
+
+==============================================================================
+RRF constant kappa, fine-tuned MiniLM
+measures: the same sweep with the fine-tuned model
+commit:   20662e2
+machine:  Lenovo ThinkPad E14 Gen 3, AMD Ryzen 7 5700U (8 cores, 16 threads), 16 GB RAM, Linux Mint 22.3 (dev machine)
+commands: for k in 1 2 5 10 20 30 60 100 200; do
+            qorfinder --model all-MiniLM-L6-v2-ft-cuad --index-dir data/eval-ft eval --kappa $k
+            python3 scripts/score.py
+          done
+
+RRF kappa sweep with the fine-tuned model (eval --kappa K, hybrid, all queries):
+kappa    ndcg@10   mrr@10  r-precision
+1         0.3557   0.4758       0.2888
+2         0.3524   0.4699       0.2888
+5         0.3502   0.4555       0.2961
+10        0.3494   0.4604       0.3019
+20        0.3442   0.4743       0.2883
+30        0.3303   0.4478       0.2925
+60        0.3176   0.4329       0.2607
+100       0.3124   0.4292       0.2523
+200       0.3016   0.4292       0.2572
+CV hybrid_ndcg@10 all 0.3557 (chosen: 1 in 17 of 17 folds). Every kappa stays below semantic alone (0.4194).
+
+==============================================================================
+Fine-tuning MiniLM: training data, template check, learning rate, epochs
+measures: the check that each training query is tied to its category, validation loss per learning rate and per epoch
+commit:   20662e2 (then check_templates.py, tune_hyperparams.py and finetune_minilm.py --save-best --learning-rate 1e-5; today all three steps are scripts/finetune.py)
+machine:  Lenovo ThinkPad E14 Gen 3, AMD Ryzen 7 5700U (8 cores, 16 threads), 16 GB RAM, Linux Mint 22.3 (dev machine)
+commands: nix develop .#reference --command python3 scripts/finetune.py
+
+Training data: the 480 CUAD contracts outside data/testset/docs.txt, split by contract 432 train / 48 val.
+51 queries (3 per test category) x every annotated clause of that category: 6771 train / 582 val pairs.
+No query shares a 3-word phrase with any of the 34 test queries (audit_templates, checked before every run).
+
+Template check under the base model (held-out clauses only):
+category                             margin   rec@10 top-1 hits
+Affiliate License-Licensee           0.1420   0.5667    3/3
+Competitive Restriction Exception    0.0306   0.0667    0/3
+Covenant Not To Sue                  0.0832   0.3000    1/3
+Irrevocable Or Perpetual License     0.0928   0.3667    2/3
+Joint Ip Ownership                   0.2073   0.9667    3/3
+Liquidated Damages                   0.1696   0.6667    2/3
+Most Favored Nation                  0.0584   0.1667    0/3
+No-Solicit Of Customers              0.0816   0.1000    1/3
+No-Solicit Of Employees              0.1673   0.8333    3/3
+Non-Compete                          0.0829   0.6000    1/3
+Non-Disparagement                    0.1018   0.4667    2/3
+Non-Transferable License             0.1239   0.5000    1/3
+Rofr/Rofo/Rofn                       0.0755   0.7000    3/3
+Third Party Beneficiary              0.1495   0.2667    2/3
+Uncapped Liability                   0.2637   0.9333    3/3
+Volume Restriction                   0.0107   0.4333    2/3
+Warranty Duration                    0.1706   0.8000    3/3
+templates: 51 (17 categories x 3)
+mean margin: 0.1183
+templates with positive margin: 50/51 (sign-test p=4.62e-14)
+mean recall@10 of own category: 0.5137 (chance 0.059)
+top-1 hit rate: 0.627 (chance 0.059, 10.7x chance)
+PASS: templates are meaningful, load-bearing queries for their categories.
+
+Learning rate: each of 1e-5, 2e-5, 5e-5 trained 3 epochs on a reduced copy of the training split
+(at most 100 pairs per category: 1698 train / 582 val pairs); lowest validation loss wins:
+lr	val_loss	val_acc@1
+1.000000e-05	1.657440	0.5052
+2.000000e-05	1.662700	0.5103
+5.000000e-05	1.681580	0.5241
+
+Training at learning rate 1e-5: in-batch negatives (MultipleNegativesRankingLoss), batch 16 = one pair per
+category, temperature 0.05, max 128 tokens, 3 epochs of 424 steps, 16 threads, CPU, 29.9 min.
+epoch  val_loss  val_acc@1
+0      1.528082  0.5275
+1      1.422807  0.5498
+2      1.413915  0.5601
+The epoch with the lowest validation loss is kept (the last): model.safetensors sha256
+2a164e0ea9bbcb15e7476881eb403d264451063df834696b8e7869cff2848bf3. Rust matches Python at cosine 1.000000.
