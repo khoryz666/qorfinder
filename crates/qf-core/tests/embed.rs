@@ -66,12 +66,15 @@ fn loads_finetuned_minilm() {
     }
     let embedder = Embedder::load(model, &dir).unwrap();
     assert_eq!(embedder.dim(), 384);
-    // The lowest-validation-loss epoch of the fine-tune,
-    // SHA-256 pinned for reproducibility.
-    assert_eq!(
-        embedder.weights_sha256(),
-        "2a164e0ea9bbcb15e7476881eb403d264451063df834696b8e7869cff2848bf3"
-    );
+    // The weights are not published, so they are pinned by the SHA-256 the
+    // reference fixture records: as committed, the reported run's
+    // (2a164e0e...); finetune.py rewrites both when it retrains.
+    let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures/reference")
+        .join(format!("{}.json", model.dir_name()));
+    let reference: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+    assert_eq!(reference["revision"], embedder.weights_sha256());
 }
 
 #[test]

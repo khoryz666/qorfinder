@@ -160,6 +160,15 @@ log and checkpoints go to `data/finetune/`; it checkpoints every epoch, and
 the same command resumes from the newest checkpoint. The recorded run is in
 `results/tuning.txt` and its scores in `results/effectiveness.txt`.
 
+The weights are not published, so the model can only be reproduced by
+retraining. Training uses every CPU thread, and floating-point sums depend on
+the thread count and the CPU: on the dev machine a rerun of the
+learning-rate step matched the recorded validation loss to six decimals, but
+elsewhere the weights come out slightly different from the reported ones
+(SHA-256 `2a164e0e…`, in `results/tuning.txt`). `finetune.py` then rewrites
+the reference fixture, and the Rust embedder must match the new model within
+the test's cosine tolerance (0.99), like every other model.
+
 ## Develop
 
 ```bash
