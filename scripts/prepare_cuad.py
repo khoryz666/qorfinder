@@ -6,10 +6,12 @@ lawyer-annotated clause spans in 41 categories. Download CUAD_v1.zip from
 https://zenodo.org/records/4595826 and unzip it under data/cuad/ first; this
 script never touches the network.
 
-Usage: python3 scripts/prepare_cuad.py [-n 50] [-x 0.3] [--seed 2026]
+Usage: python3 scripts/prepare_cuad.py
 
-Try a few values of -n and -x until 15-20 categories qualify (report
-Section 4.1.3).
+It samples N contracts with a fixed seed and keeps the clause categories
+found in at most X of them (report Section 4.1.3). N = 30 and X = 0.15 give
+the 17 categories of the frozen test set; change the constants below only to
+build a different test set.
 
 All 510 contracts go to data/cuad/txt/ (for the timing run, T10); the
 sampled ones are also copied to data/cuad/sample/, the only folder the
@@ -17,13 +19,24 @@ evaluation indexes. spans.tsv covers the sample alone, so indexing all 510
 would count their unjudged clauses as not relevant.
 """
 
-import argparse
 import json
 import random
 import re
 import shutil
 import sys
 from pathlib import Path
+
+# Contracts to sample, the largest share of them a category may appear in,
+# and the sampling seed.
+N = 30
+X = 0.15
+SEED = 2026
+
+REPO = Path(__file__).resolve().parent.parent
+CUAD_JSON = REPO / "data/cuad/CUAD_v1/CUAD_v1.json"
+TXT_DIR = REPO / "data/cuad/txt"
+SAMPLE_DIR = REPO / "data/cuad/sample"
+TESTSET = REPO / "data/testset"
 
 # Contract metadata rather than clauses a lawyer would search for.
 METADATA_CATEGORIES = {
@@ -164,30 +177,13 @@ def print_counts(counts: dict[str, int], kept: list[str], n: int, max_share: flo
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument(
-        "--cuad", type=Path, default=Path("data/cuad/CUAD_v1/CUAD_v1.json")
-    )
-    parser.add_argument("--txt-dir", type=Path, default=Path("data/cuad/txt"))
-    parser.add_argument("--sample-dir", type=Path, default=Path("data/cuad/sample"))
-    parser.add_argument("--testset", type=Path, default=Path("data/testset"))
-    parser.add_argument("-n", type=int, default=50, help="contracts to sample")
-    parser.add_argument(
-        "-x",
-        type=float,
-        default=0.3,
-        help="largest share of the sample a category may appear in",
-    )
-    parser.add_argument("--seed", type=int, default=2026)
-    args = parser.parse_args()
-
-    contracts, descriptions = load_contracts(args.cuad)
-    write_texts(contracts, args.txt_dir)
-    sample, counts, kept = sample_and_count(contracts, args.n, args.seed, args.x)
-    print_counts(counts, kept, args.n, args.x)
-    copy_sample(sample, args.txt_dir, args.sample_dir)
-    write_selection(args.testset, sample, counts, kept, descriptions)
-    write_spans(args.testset, sample, kept)
+    contracts, descriptions = load_contracts(CUAD_JSON)
+    write_texts(contracts, TXT_DIR)
+    sample, counts, kept = sample_and_count(contracts, N, SEED, X)
+    print_counts(counts, kept, N, X)
+    copy_sample(sample, TXT_DIR, SAMPLE_DIR)
+    write_selection(TESTSET, sample, counts, kept, descriptions)
+    write_spans(TESTSET, sample, kept)
     return 0
 
 

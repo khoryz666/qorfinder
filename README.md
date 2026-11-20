@@ -110,13 +110,13 @@ The evaluation uses CUAD v1 (Hendrycks et al., 2021, CC BY 4.0). Download
 `data/cuad/`, then:
 
 ```bash
-python3 scripts/prepare_cuad.py -n 30 -x 0.15
+python3 scripts/prepare_cuad.py
 ```
 
 This writes all 510 contracts to `data/cuad/txt/` with offsets matching the
-annotations, samples `-n` contracts with a fixed seed and copies them to
+annotations, samples 30 contracts with seed 2026 and copies them to
 `data/cuad/sample/`, prints how many contain each clause category, keeps the
-categories found in at most `-x` of them, and writes `docs.txt`,
+categories found in at most 15% of them, and writes `docs.txt`,
 `categories.tsv` and `spans.tsv` to `data/testset/`. The evaluation indexes
 `data/cuad/sample/` only, since the spans cover the sample alone; the full
 `data/cuad/txt/` is for the timing run.
