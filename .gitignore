@@ -8,10 +8,8 @@
 /data/t7-change
 /models
 /doc
-# fine-tuning outputs: the weights and raw logs stay local
-/results/finetune-minilm/checkpoints/
-/results/finetune-minilm/model/
-/results/finetune-minilm/model-best/
+# raw output of qorfinder eval and score.py; results/ keeps the curated files
+/results/eval
 .cache/
 .env
 .DS_Store
@@ -23,4 +21,3 @@ result-*
 __pycache__/
 .venv/
 THIRD_PARTY_LICENSES.html
-!/results/finetune-minilm/train.log

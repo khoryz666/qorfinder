@@ -69,15 +69,15 @@ Each supported model is one entry in `crates/qf-core/src/embed/models.rs`
 | `all-MiniLM-L6-v2-ft-cuad`                         | BERT, 6 layers   | 384  | mean        | none (trained here, see [Fine-tuning](#fine-tuning))               |
 
 ```bash
-qorfinder --model intfloat/e5-base-v2 --index-dir data/eval-e5 eval --out results/e5
+qorfinder --model intfloat/e5-base-v2 --index-dir data/eval-e5 eval
 ```
 
-The four were compared on the frozen test set in `results/model-sweep/`
-(`sweep.txt`). The default stays all-MiniLM-L6-v2: all-mpnet-base-v2 scores
-best, but no model brings semantic search within 0.05 nDCG@10 of BM25 on the
-matched queries, and the base models are about 3.4× slower per query.
-The fine-tuned MiniLM does (`results/finetune-minilm/summary.txt`), but it is
-trained locally, not published, so the release keeps the original weights.
+The models were compared on the frozen test set (`results/effectiveness.txt`,
+`results/efficiency.txt`). The default stays all-MiniLM-L6-v2:
+all-mpnet-base-v2 scores best, but no base model brings semantic search within
+0.05 nDCG@10 of BM25 on the matched queries, and the 768-dimension models are
+about 3.4× slower per query. The fine-tuned MiniLM does, but it is trained
+locally, not published, so the release keeps the original weights.
 
 ## How it works
 
@@ -157,8 +157,8 @@ category under the base model, picks the learning rate by validation loss,
 trains, copies the epoch with the lowest validation loss to
 `models/all-MiniLM-L6-v2-ft-cuad/` and writes its reference embeddings. Its
 log and checkpoints go to `data/finetune/`; it checkpoints every epoch, and
-the same command resumes from the newest checkpoint. The recorded run and its
-scores are in `results/finetune-minilm/`.
+the same command resumes from the newest checkpoint. The recorded run is in
+`results/tuning.txt` and its scores in `results/effectiveness.txt`.
 
 ## Develop
 
