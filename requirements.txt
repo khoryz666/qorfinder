@@ -1,0 +1,20 @@
+# Python packages for scripts/score.py, pinned to the versions the flake's
+# default shell provides (Python 3.14). Nix users need nothing from here;
+# elsewhere: python3 -m pip install -r requirements.txt
+# ranx also pulls in ir_datasets, which score.py never imports; the flake
+# and tools/setup-windows.ps1 leave it out.
+ranx==0.3.21
+scipy==1.18.0
+numpy==2.5.1
+numba==0.67.0
+pandas==3.0.4
+cbor2==6.1.3
+fastparquet==2026.5.0
+lz4==4.4.5
+orjson==3.11.9
+pyyaml==6.0.3
+requests==2.34.2
+rich==15.0.0
+seaborn==0.13.2
+tabulate==0.10.0
+tqdm==4.68.4

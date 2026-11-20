@@ -186,6 +186,10 @@ tools, the pinned Rust, Node.js, Python and Git):
 powershell -ExecutionPolicy Bypass -File .\tools\setup-windows.ps1 -SkipDocs -WithScoring -Build
 ```
 
+Without Nix, `requirements.txt` (scoring) and `requirements-finetune.txt`
+(fine-tuning and reference embeddings) pin the Python packages to the
+flake's versions: `python3 -m pip install -r requirements.txt`.
+
 Regenerating the reference embeddings needs sentence-transformers and PyTorch, which live in a
 separate shell. It writes one file for every model in `models/` to
 `crates/qf-core/tests/fixtures/reference/`; the test checks each fetched model
