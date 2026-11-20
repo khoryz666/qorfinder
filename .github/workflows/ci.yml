@@ -49,7 +49,7 @@ jobs:
         run: nix develop --ignore-environment --keep HOME --command cargo test --workspace -- --include-ignored
 
       - name: Check the scoring script
-        run: nix develop --ignore-environment --keep HOME --command python3 scripts/test_score.py
+        run: nix develop --ignore-environment --keep HOME --command python3 scripts/score.py
 
       - name: Type-check and build the UI
         run: nix develop --ignore-environment --keep HOME --command sh -c "cd ui && npm ci && npm run build"

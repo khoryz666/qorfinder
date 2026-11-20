@@ -126,12 +126,12 @@ run and then frozen. To score:
 
 ```bash
 qorfinder eval                       # indexes data/cuad/sample into data/eval-index
-python3 scripts/score.py results/eval   # nDCG@10, MRR@10, R-Precision, Wilcoxon
+python3 scripts/score.py            # nDCG@10, MRR@10, R-Precision, Wilcoxon
 qorfinder --index-dir <index of data/cuad/txt> eval --timing   # latency
 ```
 
-`score.py` writes `scores.txt` and `per_query.csv` beside the run files;
-`scripts/test_score.py` checks it against a hand-worked example.
+`score.py` first checks itself against a hand-worked example, then writes
+`scores.txt` and `per_query.csv` beside the run files in `results/eval/`.
 `scripts/cv_select.py` picks a setting (such as `--kappa`) from several scored
 runs by leave-one-category-out cross-validation.
 
