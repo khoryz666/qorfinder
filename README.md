@@ -106,19 +106,20 @@ trained locally, not published, so the release keeps the original weights.
 ## Test collection
 
 The evaluation uses CUAD v1 (Hendrycks et al., 2021, CC BY 4.0). Download
-`CUAD_v1.zip` from <https://zenodo.org/records/4595826>, unzip it under
-`data/cuad/`, then:
+`CUAD_v1.zip` from <https://zenodo.org/records/4595826> into `data/cuad/`
+(no need to unzip it), then:
 
 ```bash
 python3 scripts/prepare_cuad.py
 ```
 
-This writes all 510 contracts to `data/cuad/txt/` with offsets matching the
-annotations, samples 30 contracts with seed 2026 and copies them to
-`data/cuad/sample/`, prints how many contain each clause category, keeps the
-categories found in at most 15% of them, and writes `docs.txt`,
-`categories.tsv` and `spans.tsv` to `data/testset/`. The evaluation indexes
-`data/cuad/sample/` only, since the spans cover the sample alone; the full
+This checks the zip's SHA-256, writes all 510 contracts to `data/cuad/txt/`
+with offsets matching the annotations, samples 30 contracts with seed 2026
+and copies them to `data/cuad/sample/`, prints how many contain each clause
+category, keeps the categories found in at most 15% of them, and writes
+`docs.txt`, `categories.tsv` and `spans.tsv` to `data/testset/`. The
+evaluation indexes `data/cuad/sample/` only, since the spans cover the
+sample alone; the full
 `data/cuad/txt/` is for the timing run.
 
 The queries in `data/testset/queries.jsonl` are written before the first

@@ -3,8 +3,8 @@
 
 CUAD (Hendrycks et al., 2021; CC BY 4.0) has 510 commercial contracts with
 lawyer-annotated clause spans in 41 categories. Download CUAD_v1.zip from
-https://zenodo.org/records/4595826 and unzip it under data/cuad/ first; this
-script never touches the network.
+https://zenodo.org/records/4595826 into data/cuad/ first; this script checks
+its SHA-256, extracts CUAD_v1.json from it and never touches the network.
 
 Usage: python3 scripts/prepare_cuad.py
 
@@ -19,11 +19,13 @@ evaluation indexes. spans.tsv covers the sample alone, so indexing all 510
 would count their unjudged clauses as not relevant.
 """
 
+import hashlib
 import json
 import random
 import re
 import shutil
 import sys
+import zipfile
 from pathlib import Path
 
 # Contracts to sample, the largest share of them a category may appear in,
@@ -33,6 +35,9 @@ X = 0.15
 SEED = 2026
 
 REPO = Path(__file__).resolve().parent.parent
+CUAD_ZIP = REPO / "data/cuad/CUAD_v1.zip"
+# CUAD_v1.zip as published in Zenodo record 4595826.
+CUAD_ZIP_SHA256 = "88b694d99007d39777fa44cd72daf8297773d285dc3eab0091ba32078888d18e"
 CUAD_JSON = REPO / "data/cuad/CUAD_v1/CUAD_v1.json"
 TXT_DIR = REPO / "data/cuad/txt"
 SAMPLE_DIR = REPO / "data/cuad/sample"
@@ -46,6 +51,23 @@ METADATA_CATEGORIES = {
     "Effective Date",
     "Expiration Date",
 }
+
+
+def open_cuad_zip() -> zipfile.ZipFile:
+    """CUAD_v1.zip, after checking it is the published file."""
+    digest = hashlib.sha256()
+    with CUAD_ZIP.open("rb") as f:
+        for block in iter(lambda: f.read(1 << 20), b""):
+            digest.update(block)
+    if digest.hexdigest() != CUAD_ZIP_SHA256:
+        sys.exit(f"{CUAD_ZIP}: sha256 {digest.hexdigest()}, expected {CUAD_ZIP_SHA256}")
+    return zipfile.ZipFile(CUAD_ZIP)
+
+
+def extract_json(cuad: zipfile.ZipFile) -> None:
+    """Write CUAD_v1.json where this script and finetune.py read it."""
+    CUAD_JSON.parent.mkdir(parents=True, exist_ok=True)
+    CUAD_JSON.write_bytes(cuad.read("CUAD_v1/CUAD_v1.json"))
 
 
 def load_contracts(cuad_json: Path) -> tuple[list[dict], dict[str, str]]:
@@ -177,6 +199,7 @@ def print_counts(counts: dict[str, int], kept: list[str], n: int, max_share: flo
 
 
 def main() -> int:
+    extract_json(open_cuad_zip())
     contracts, descriptions = load_contracts(CUAD_JSON)
     write_texts(contracts, TXT_DIR)
     sample, counts, kept = sample_and_count(contracts, N, SEED, X)
