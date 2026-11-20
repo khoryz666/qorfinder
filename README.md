@@ -151,7 +151,7 @@ python3 scripts/tune_hyperparams.py   # learning rate by validation loss
 python3 scripts/finetune_minilm.py --save-best --learning-rate <the best one>
 mkdir -p models/all-MiniLM-L6-v2-ft-cuad
 cp results/finetune-minilm/model-best/* models/all-MiniLM-L6-v2-ft-cuad/
-python3 scripts/reference_embeddings_ft.py
+python3 scripts/reference_embeddings.py
 exit
 qorfinder --model all-MiniLM-L6-v2-ft-cuad --index-dir data/eval-ft eval --reindex --out results/finetune-minilm/eval
 ```
@@ -171,12 +171,12 @@ cargo test -- --include-ignored   # also the tests that load models/
 Every tool comes from the locked flake, so any machine with Nix (flakes
 enabled) gets the same environment with no other setup. Regenerating the
 reference embeddings needs sentence-transformers and PyTorch, which live in a
-separate shell. It writes one file per model to
+separate shell. It writes one file for every model in `models/` to
 `crates/qf-core/tests/fixtures/reference/`; the test checks each fetched model
 against it and skips the others:
 
 ```bash
-nix develop .#reference --command python3 scripts/reference_embeddings.py [--model ID]
+nix develop .#reference --command python3 scripts/reference_embeddings.py
 ```
 
 Layout:
