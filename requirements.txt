@@ -3,11 +3,13 @@
 # elsewhere: python3 -m pip install -r requirements.txt
 # ranx also pulls in ir_datasets, which score.py never imports; the flake
 # and tools/install-scoring.ps1 (Windows) leave it out.
+# One exception: the flake has pandas 3.0.4, which PyPI yanked over
+# datetime segfaults; 3.0.6 gives byte-identical scores and per_query.csv.
 ranx==0.3.21
 scipy==1.18.0
 numpy==2.5.1
 numba==0.67.0
-pandas==3.0.4
+pandas==3.0.6
 cbor2==6.1.3
 fastparquet==2026.5.0
 lz4==4.4.5
