@@ -52,3 +52,18 @@ fn model_folder_comes_from_the_model_id() {
         "{stderr}"
     );
 }
+
+/// A chunk longer than the model reads would be cut off unseen, so such a
+/// size is refused before anything loads.
+#[test]
+fn chunks_longer_than_the_model_input_are_refused() {
+    let dir = tempfile::tempdir().unwrap();
+    let out = qorfinder(&["search", "x", "--max-tokens", "300"], dir.path());
+    assert!(!out.status.success());
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(stderr.contains("does not fit"), "{stderr}");
+    assert!(stderr.contains("256 tokens"), "{stderr}");
+    let out = qorfinder(&["search", "x", "--max-tokens", "254"], dir.path());
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(!stderr.contains("does not fit"), "{stderr}");
+}

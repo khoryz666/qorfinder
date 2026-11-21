@@ -145,7 +145,8 @@ Global options: `--index-dir` (`QORFINDER_INDEX_DIR`; default
 `qorfinder/index` in the user's local data folder), `--model`
 (`QORFINDER_MODEL`), `--model-dir` (`QORFINDER_MODEL_DIR`; default
 `models/<name>` next to the executable or in the current folder),
-`--max-tokens` (200) and `--overlap` (40). An index is only searched with the
+`--max-tokens` (200; at most the model's input length minus its 2 special
+tokens, 254 for MiniLM) and `--overlap` (40). An index is only searched with the
 model and chunk settings it was built with.
 
 ### 3.4 Models

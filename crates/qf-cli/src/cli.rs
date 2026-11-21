@@ -135,10 +135,26 @@ struct ChunkArgs {
     overlap: usize,
 }
 
+/// Tokens the model adds to every chunk: `[CLS]` and `[SEP]` (or MPNet's
+/// `<s>` and `</s>`).
+const SPECIAL_TOKENS: usize = 2;
+
 impl ChunkArgs {
-    fn config(&self) -> Result<ChunkConfig> {
+    /// The settings, refused when a full chunk would not fit the model's
+    /// input, whose overflow the embedder would drop unseen.
+    /// shortcut: the passage prefix (e5's "passage: ") is not counted; count it with the tokenizer if a chunk size near the limit is ever wanted.
+    fn config(&self, model: &Model) -> Result<ChunkConfig> {
         if self.overlap >= self.max_tokens {
             bail!("--overlap must be smaller than --max-tokens");
+        }
+        if self.max_tokens + SPECIAL_TOKENS > model.max_seq_len {
+            bail!(
+                "--max-tokens {} does not fit {}, which reads at most {} tokens \
+                 including {SPECIAL_TOKENS} special ones",
+                self.max_tokens,
+                model.id,
+                model.max_seq_len
+            );
         }
         Ok(ChunkConfig {
             max_tokens: self.max_tokens,
@@ -175,7 +191,7 @@ pub fn run() -> Result<()> {
             dry_run,
             chunking,
         } => {
-            let config = chunking.config()?;
+            let config = chunking.config(cli.model)?;
             if dry_run {
                 return dry_run_index(&folder, model_files, config);
             }
@@ -184,7 +200,13 @@ pub fn run() -> Result<()> {
         }
         Command::Search { query, k, chunking } => {
             let index_dir = cli.index_dir.unwrap_or_else(default_index_dir);
-            search(&query, k, &index_dir, model_files, chunking.config()?)
+            search(
+                &query,
+                k,
+                &index_dir,
+                model_files,
+                chunking.config(cli.model)?,
+            )
         }
         Command::Eval {
             testset,
@@ -195,7 +217,7 @@ pub fn run() -> Result<()> {
             kappa,
             chunking,
         } => {
-            let config = chunking.config()?;
+            let config = chunking.config(cli.model)?;
             if timing {
                 let index_dir = cli.index_dir.unwrap_or_else(default_index_dir);
                 return crate::eval::timing(&testset, &out, &index_dir, model_files, config);
@@ -217,7 +239,7 @@ pub fn run() -> Result<()> {
         }
         Command::Serve { port, chunking } => {
             let index_dir = cli.index_dir.unwrap_or_else(default_index_dir);
-            crate::serve::run(port, &index_dir, model_files, chunking.config()?)
+            crate::serve::run(port, &index_dir, model_files, chunking.config(cli.model)?)
         }
     }
 }

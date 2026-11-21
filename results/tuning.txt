@@ -33,6 +33,9 @@ max/overlap  chunks  relevant  method    matched  paraphrased  all   (nDCG@10)
 300/60         1123       132  bm25        0.3365   0.1311   0.2338
 300/60         1123       132  semantic    0.2263   0.1468   0.1866
 300/60         1123       132  hybrid      0.3010   0.1803   0.2407
+MiniLM reads at most 256 tokens including [CLS] and [SEP], so at 256/40 and 300/60 the embedder cut
+the end off every full-size chunk (2 and 46 tokens) while BM25 indexed all of it; their semantic and
+hybrid rows measure truncated chunks. qorfinder now refuses both sizes for MiniLM (254 is its largest).
 
 Leave-one-category-out cross-validation over the six settings:
 CV bm25_ndcg@10 matched      0.2957
