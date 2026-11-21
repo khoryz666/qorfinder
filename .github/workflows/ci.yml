@@ -28,7 +28,7 @@ jobs:
 
       # --ignore-environment hides the runner's own cargo, Node and Python,
       # so a tool missing from the flake fails here instead of being found
-      # on the runner's PATH (test case T14).
+      # on the runner's PATH (test case T13).
       - name: Check formatting
         run: nix develop --ignore-environment --keep HOME --command cargo fmt --all -- --check
 
