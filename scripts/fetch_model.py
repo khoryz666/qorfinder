@@ -137,7 +137,9 @@ def fetch_model(model_id: str) -> bool:
             fetch(model_id, revision, name, dest)
         actual = sha256(dest)
         if actual != expected:
-            print(f"{dest}: sha256 {actual}, expected {expected}", file=sys.stderr)
+            # Deleted, or every rerun would only re-check the bad file.
+            dest.unlink()
+            print(f"{dest}: sha256 {actual}, expected {expected}; deleted, run again to re-download", file=sys.stderr)
             return False
         print(f"ok {dest} {actual}")
     return True
