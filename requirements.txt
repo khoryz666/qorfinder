@@ -2,7 +2,7 @@
 # default shell provides (Python 3.14). Nix users need nothing from here;
 # elsewhere: python3 -m pip install -r requirements.txt
 # ranx also pulls in ir_datasets, which score.py never imports; the flake
-# and tools/setup-windows.ps1 leave it out.
+# and tools/install-scoring.ps1 (Windows) leave it out.
 ranx==0.3.21
 scipy==1.18.0
 numpy==2.5.1

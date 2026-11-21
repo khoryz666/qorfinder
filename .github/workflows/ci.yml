@@ -100,21 +100,11 @@ jobs:
       - name: Test
         run: cargo test --workspace -- --include-ignored
 
-      # As in flake.nix: ranx without ir_datasets, whose one use
-      # (Qrels.from_ir_datasets) becomes a lazy import.
+      # The versions in requirements.txt; ranx without ir_datasets, as in
+      # flake.nix.
       - name: Install the scoring packages
         shell: pwsh
-        run: |
-          Get-Content requirements.txt | Where-Object { $_ -notmatch '^ranx==' } | Set-Content scoring-deps.txt
-          python -m pip install -r scoring-deps.txt
-          python -m pip install --no-deps (Select-String -Path requirements.txt -Pattern '^ranx==').Line
-          $site = python -c "import sysconfig; print(sysconfig.get_paths()['purelib'])"
-          $qrels = Join-Path $site 'ranx/data_structures/qrels.py'
-          $source = (Get-Content -Raw $qrels) -replace "(?m)^import ir_datasets\r?\n", ''
-          $source = $source.Replace(
-            '        qrels = Qrels.from_dict(ir_datasets',
-            "        import ir_datasets`n`n        qrels = Qrels.from_dict(ir_datasets")
-          Set-Content -NoNewline -Path $qrels -Value $source
+        run: ./tools/install-scoring.ps1
 
       - name: Check the scoring script
         run: python scripts/score.py
