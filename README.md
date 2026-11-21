@@ -29,12 +29,22 @@ powershell -ExecutionPolicy Bypass -File .\tools\setup-windows.ps1 -WithScoring 
 ```
 
 **Elsewhere without Nix**, install the same versions by hand: rustup reads
-`rust-toolchain.toml`, `ui/package.json` asks for Node.js 24, and
-`requirements.txt` (scoring) and `requirements-finetune.txt` (fine-tuning)
-pin the Python packages the scripts import to the flake's versions and leave
-their dependencies to pip (`python3 -m pip install -r requirements.txt`; ranx
-also pulls in `ir_datasets`, which is never used). Node.js 24.19.0 and Python
-3.14.7 are the flake's versions, which CI and the release workflow pin too.
+`rust-toolchain.toml`, and Node.js 24.19.0 and Python 3.14.7 are the flake's
+versions, which CI and the release workflow pin too. `requirements.txt`
+(scoring) and `requirements-finetune.txt` (fine-tuning) list every Python
+package of the flake's two shells, direct and transitive, at its exact
+version; install them as they are, without resolving anything:
+
+```bash
+python3 -m pip install --no-deps -r requirements.txt
+```
+
+Both files are generated from the flake, and CI fails if they differ from it.
+After changing `flake.nix` or `flake.lock`, regenerate them:
+
+```bash
+nix build .#requirements && cp result/requirements*.txt . && chmod u+w requirements*.txt
+```
 
 Then fetch the model and build:
 

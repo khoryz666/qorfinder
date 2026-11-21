@@ -659,14 +659,12 @@ function Install-Scoring {
 
     Invoke-Process -FilePath $venvPython -Arguments @('-m', 'pip', 'install', '--upgrade', 'pip') -Label 'Upgrade pip'
 
-    # The versions in requirements.txt, installed as the Windows CI job does.
-    Write-Step 'Install the scoring packages (requirements.txt)'
-    try {
-        & (Join-Path $script:Repo 'tools\install-scoring.ps1') -Python $venvPython
-        Write-Ok 'scoring packages installed'
-    }
-    catch {
-        Write-Fail "scoring packages: $($_.Exception.Message)"
+    # Every package of the flake's scoring shell at its version, as CI installs them.
+    $code = Invoke-Process -FilePath $venvPython -Arguments @(
+        '-m', 'pip', 'install', '--no-deps', '-r', (Join-Path $script:Repo 'requirements.txt')
+    ) -Label 'Install the scoring packages (requirements.txt)' -AllowFail
+    if ($code -ne 0) {
+        Write-Fail 'scoring packages were not installed'
         return
     }
 

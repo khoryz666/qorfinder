@@ -18,9 +18,13 @@ import json
 import math
 import sys
 import tempfile
+import types
 from pathlib import Path
 
-from ranx import Qrels, Run, evaluate
+# ranx imports ir_datasets at the top but uses it only in Qrels.from_ir_datasets,
+# which this script never calls; requirements.txt leaves it out.
+sys.modules.setdefault("ir_datasets", types.ModuleType("ir_datasets"))
+from ranx import Qrels, Run, evaluate  # noqa: E402
 from scipy.stats import wilcoxon
 
 METHODS = ["bm25", "semantic", "hybrid"]
