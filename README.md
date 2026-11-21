@@ -42,7 +42,7 @@ instead of embedding anything, which is useful for checking extraction.
 |---|---|
 | `index <folder> [--dry-run]` | Extract, chunk and embed every PDF, DOCX and TXT file, replacing the previous index. Bad files are skipped with a reason. |
 | `search "<query>" [-k 10]` | Print the top passages with file, page, character range and score. |
-| `eval [--timing]` | Run the CUAD test queries through BM25, semantic search and their RRF fusion and write TREC qrels and run files; with `--timing`, time every query instead. |
+| `eval [--timing]` | Run the CUAD test queries through BM25, semantic search and their RRF fusion and write TREC qrels and run files to `results/eval/`; with `--timing`, time every query instead. Run it from the repository root: its default folders (`data/testset`, `data/cuad/sample`, `data/eval-index`, `results/eval`) are relative to the current folder. |
 | `serve [--port 0]` | Open the browser UI: choose a folder, watch indexing, search and open files. Listens on 127.0.0.1 only, and every API call needs the random token in the address it opens. |
 
 Global options: `--index-dir` (or `QORFINDER_INDEX_DIR`; default

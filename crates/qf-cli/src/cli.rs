@@ -77,6 +77,10 @@ enum Command {
     },
     /// Score BM25, semantic search and their RRF fusion on the CUAD test
     /// set: writes TREC qrels and run files for scripts/score.py
+    ///
+    /// Its default folders (data/testset, data/cuad/sample, data/eval-index,
+    /// results/eval) are relative to the current folder, so run it from the
+    /// repository root.
     Eval {
         /// Folder holding queries.jsonl and spans.tsv
         #[arg(long, default_value = "data/testset")]
