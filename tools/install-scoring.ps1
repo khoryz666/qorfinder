@@ -1,7 +1,8 @@
 <#
 .SYNOPSIS
     Installs the Python packages scripts\score.py needs, at the versions in
-    requirements.txt, into the given Python (a venv, or CI's Python).
+    requirements.txt and with their own dependencies resolved by pip, into
+    the given Python (a venv, or CI's Python).
 
 .DESCRIPTION
     As in flake.nix, ranx is installed without ir_datasets, whose only use
@@ -33,6 +34,12 @@ $others = Join-Path ([IO.Path]::GetTempPath()) 'qorfinder-scoring-requirements.t
 $lines | Where-Object { $_ -notmatch '^ranx==' } | Set-Content -LiteralPath $others
 Invoke-Python -m pip install -r $others
 Invoke-Python -m pip install --no-deps $ranx
+# ranx's own dependencies, unpinned as pip would resolve them, minus ir_datasets.
+$deps = @(& $Python -c "import importlib.metadata as m; print('\n'.join(r for r in m.requires('ranx') or [] if 'extra ==' not in r and not r.lower().replace('-', '_').startswith('ir_datasets')))" |
+    Where-Object { $_.Trim() })
+if ($LASTEXITCODE -ne 0) { throw "cannot read the dependencies of $ranx" }
+# ranx imports these too but declares them only through ir_datasets (flake.nix lists them for the same reason).
+Invoke-Python -m pip install @deps requests pyyaml
 
 $site = (& $Python -c "import sysconfig; print(sysconfig.get_paths()['purelib'])").Trim()
 $qrels = Join-Path $site 'ranx/data_structures/qrels.py'

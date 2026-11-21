@@ -1,11 +1,9 @@
-# Python packages for scripts/finetune.py and scripts/reference_embeddings.py,
-# pinned to the versions the flake's reference shell provides (Python 3.14).
+# Python packages that scripts/finetune.py and scripts/reference_embeddings.py
+# import, pinned to the versions the flake's reference shell provides
+# (Python 3.14.7). Their own dependencies are left for pip to resolve.
 # Nix users run `nix develop .#reference`; elsewhere:
 # python3 -m pip install -r requirements-finetune.txt
 torch==2.13.0
 transformers==5.16.1
 sentence-transformers==6.0.1
-tokenizers==0.23.2
-safetensors==0.8.0
-huggingface-hub==1.30.0
 numpy==2.5.1
