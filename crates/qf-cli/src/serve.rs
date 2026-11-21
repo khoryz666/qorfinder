@@ -8,6 +8,7 @@
 //! files (report 3.6, T8).
 
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 
 use anyhow::{Context, Result};
@@ -44,6 +45,9 @@ pub struct App {
     pub tokenizer: ModelTokenizer,
     /// `None` while there is no usable index.
     pub searcher: Mutex<Option<Searcher<'static>>>,
+    /// Counts index openings. Chunk ids are renumbered by every rebuild,
+    /// so a result is opened only in the index it came from.
+    pub generation: AtomicU32,
     /// Why there is no usable index, shown in the UI.
     pub problem: Mutex<Option<String>>,
     /// The current or last indexing run.
@@ -103,6 +107,7 @@ impl App {
         let mut slot = self.searcher.lock().unwrap();
         *slot = None;
         let opened = Searcher::open(&self.index_dir, self.embedder, &meta);
+        self.generation.fetch_add(1, Ordering::SeqCst);
         *self.problem.lock().unwrap() = opened.as_ref().err().map(|e| e.to_string());
         *slot = opened.ok();
     }
@@ -124,6 +129,7 @@ pub fn run(
         embedder,
         tokenizer: load_tokenizer(model_files)?,
         searcher: Mutex::new(None),
+        generation: AtomicU32::new(0),
         problem: Mutex::new(None),
         job: Mutex::new(Job::default()),
     });
@@ -333,6 +339,7 @@ async fn search(State(app): State<Arc<App>>, Query(params): Query<SearchParams>)
         let ms = |d: std::time::Duration| d.as_secs_f64() * 1e3;
         Ok(json!({
             "results": items,
+            "index": app.generation.load(Ordering::SeqCst),
             "encode_ms": ms(result.encode_time),
             "scan_ms": ms(result.scan_time),
         }))
@@ -461,6 +468,8 @@ async fn pick_folder() -> Response {
 #[derive(Deserialize)]
 struct OpenRequest {
     chunk_id: u32,
+    /// The `index` of the search response the result came from.
+    index: u32,
 }
 
 /// Open the file a result came from in its default app. Only files in the
@@ -471,6 +480,12 @@ async fn open_file(State(app): State<Arc<App>>, Json(req): Json<OpenRequest>) ->
         let Some(searcher) = &*slot else {
             return error(StatusCode::CONFLICT, "no index is open");
         };
+        if req.index != app.generation.load(Ordering::SeqCst) {
+            return error(
+                StatusCode::CONFLICT,
+                "the index was rebuilt since this search; search again",
+            );
+        }
         let store = searcher.store();
         match store
             .chunk(req.chunk_id)

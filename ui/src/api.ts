@@ -59,6 +59,8 @@ export interface Result {
 
 export interface SearchResponse {
   results: Result[];
+  /** Which opening of the index answered; sent back to open a result. */
+  index: number;
   encode_ms: number;
   scan_ms: number;
 }
@@ -83,5 +85,6 @@ export const api = {
   index: (folder: string | null) => call<void>("POST", "/index", { folder }),
   indexStatus: () => call<Job>("GET", "/index/status"),
   pickFolder: () => call<{ folder: string | null }>("POST", "/folders/pick"),
-  open: (chunkId: number) => call<void>("POST", "/open", { chunk_id: chunkId }),
+  open: (chunkId: number, index: number) =>
+    call<void>("POST", "/open", { chunk_id: chunkId, index }),
 };

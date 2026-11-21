@@ -84,9 +84,9 @@ function SearchView({ status }: { status: Status | null }) {
     }
   }
 
-  async function open(chunkId: number) {
+  async function open(chunkId: number, index: number) {
     try {
-      await api.open(chunkId);
+      await api.open(chunkId, index);
     } catch (err) {
       setError((err as Error).message);
     }
@@ -133,7 +133,7 @@ function SearchView({ status }: { status: Status | null }) {
                   {r.page !== null && ` · page ${r.page}`} · characters {r.char_start}–{r.char_end}
                 </div>
                 <p className="passage">{r.text}</p>
-                <button onClick={() => open(r.chunk_id)}>Open file</button>
+                <button onClick={() => open(r.chunk_id, response.index)}>Open file</button>
               </li>
             ))}
           </ol>
