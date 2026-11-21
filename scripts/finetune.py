@@ -83,7 +83,8 @@ without any wall-clock dependence; the log is flushed after every line and
 every checkpoint is written to a temporary directory and atomically renamed,
 so an interruption (including power loss) leaves the previous checkpoint
 intact. On restart the script resumes from the newest checkpoint, and the
-learning rates already tuned are not tuned again.
+learning rates already tuned are not tuned again. Resuming is refused if
+data/finetune/settings.json shows the templates or settings have changed.
 """
 
 from __future__ import annotations
@@ -144,6 +145,7 @@ TESTSET_QUERIES = REPO / "data/testset/queries.jsonl"
 WORK = REPO / "data/finetune"
 LOG = WORK / "finetune.log"
 TUNING_TSV = WORK / "hyperparams.tsv"
+SETTINGS_JSON = WORK / "settings.json"
 CHECKPOINTS = WORK / "checkpoints"
 
 # ---------------------------------------------------------------------------
@@ -725,6 +727,31 @@ def install(checkpoint: Path) -> None:
 # Main
 # ---------------------------------------------------------------------------
 
+def check_settings() -> None:
+    """Exit if data/finetune was filled under other settings. Step 2 reuses
+    the losses it finds there and step 3 resumes from its checkpoints, so a
+    changed template or constant would otherwise train nothing new."""
+    settings = json.loads(json.dumps({
+        "seed": SEED,
+        "max_seq_len": MAX_SEQ_LEN,
+        "batch_size": BATCH_SIZE,
+        "temperature": TEMPERATURE,
+        "val_share": VAL_SHARE,
+        "tune_learning_rates": TUNE_LEARNING_RATES,
+        "tune_epochs": TUNE_EPOCHS,
+        "tune_max_pairs_per_category": TUNE_MAX_PAIRS_PER_CATEGORY,
+        "epochs": EPOCHS,
+        "templates": QUERY_TEMPLATES,
+        "base_model_sha256": sha256(BASE_MODEL / "model.safetensors"),
+        "testset_docs_sha256": sha256(TESTSET_DOCS),
+    }))
+    WORK.mkdir(parents=True, exist_ok=True)
+    if not SETTINGS_JSON.exists():
+        SETTINGS_JSON.write_text(json.dumps(settings, indent=1) + "\n", encoding="utf-8")
+    elif json.loads(SETTINGS_JSON.read_text(encoding="utf-8")) != settings:
+        sys.exit(f"{WORK} holds the results of other settings; delete it to train with these")
+
+
 def set_threads() -> None:
     for var in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS", "VECLIB_MAXIMUM_THREADS"):
         os.environ[var] = str(THREADS)
@@ -740,6 +767,7 @@ def seed_everything() -> None:
 
 def main() -> int:
     set_threads()
+    check_settings()
     log("--- finetune.py started ---")
     audit_templates()
     log(f"templates share no 3-word phrase with {TESTSET_QUERIES}")
