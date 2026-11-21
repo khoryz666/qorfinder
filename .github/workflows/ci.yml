@@ -8,8 +8,8 @@ on:
 # Both jobs run the same checks in the same order: formatting, lint,
 # release build, the tests (with the model), the scoring check and the UI
 # build. Linux takes every tool from the flake; Windows has no Nix, so it
-# takes the same versions from rust-toolchain.toml, requirements.txt and
-# Node.js 24.
+# takes the same versions from rust-toolchain.toml, requirements.txt and the
+# Node.js and Python versions pinned below, which are the flake's.
 jobs:
   linux:
     name: linux
@@ -84,7 +84,7 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.14"
+          python-version: "3.14.7"
 
       - name: Cache the model
         uses: actions/cache@v4
@@ -111,7 +111,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 24.19.0
 
       - name: Type-check and build the UI
         run: npm ci && npm run build
