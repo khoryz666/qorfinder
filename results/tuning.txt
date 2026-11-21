@@ -150,3 +150,19 @@ epoch  val_loss  val_acc@1
 2      1.413915  0.5601
 The epoch with the lowest validation loss is kept (the last): model.safetensors sha256
 2a164e0ea9bbcb15e7476881eb403d264451063df834696b8e7869cff2848bf3. Rust matches Python at cosine 1.000000.
+
+Rerun from a fresh clone at 833d4ea, same machine, same command, 16 threads, seed 2026 (2026-11-21):
+the 1e-5 row matched to six decimals, the others did not, so 2e-5 was chosen.
+lr	val_loss	val_acc@1
+1.000000e-05	1.657440	0.5052
+2.000000e-05	1.635805	0.5223
+5.000000e-05	1.666571	0.5395
+epoch  val_loss  val_acc@1
+0      1.492975  0.5515
+1      1.420579  0.5687
+2      1.487521  0.5687
+Epoch 1 kept: model.safetensors sha256 fca3ac2bb6aa882499372767a69eaac143c60bd5cc6a27a7a94ce2bff0bc846f.
+nDCG@10 over all 34 queries, recorded -> rerun: semantic 0.4194 -> 0.4236, hybrid 0.3502 -> 0.3582
+(bm25 0.2141 unchanged); no difference between the two models is significant (paired t-test, p >= 0.05).
+The whole script took 3 h 44 min (training alone 2 h 06 min, against 29.9 min for the recorded run;
+the cause of the slower run was not measured). The reported results use the recorded model.

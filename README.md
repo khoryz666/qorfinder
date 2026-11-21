@@ -263,16 +263,17 @@ python3 scripts/score.py
 `finetune.py` trains on the clauses of the 480 CUAD contracts outside the
 test sample, and refuses to run if any training query shares a three-word
 phrase with a test query. It checks the templates, picks the learning rate
-by validation loss, trains (30 minutes on the dev machine; it resumes from
-the newest checkpoint in `data/finetune/`), copies the best epoch to
-`models/all-MiniLM-L6-v2-ft-cuad/` and rewrites its reference fixture.
+by validation loss, trains (it resumes from the newest checkpoint in
+`data/finetune/`), copies the best epoch to
+`models/all-MiniLM-L6-v2-ft-cuad/` and rewrites its reference fixture. The
+whole script took 3 h 44 min on the dev machine in the last rerun.
 
 The weights are not published, so the model is reproduced only by
-retraining. Floating-point sums depend on the CPU and the thread count: on
-the dev machine a rerun of the learning-rate step matched the record to six
-decimals, but elsewhere the weights differ slightly from the reported ones
-(SHA-256 `2a164e0e…`), and the Rust embedder is then checked against the new
-model's own fixture.
+retraining, and training is not deterministic even on the same machine: a
+rerun on the dev machine chose a different learning rate and gave different
+weights from the reported ones (SHA-256 `2a164e0e…`), with nDCG@10 within
+0.01 of the record and no significant difference (`results/tuning.txt`). The
+Rust embedder is then checked against the new model's own fixture.
 
 ## License
 
