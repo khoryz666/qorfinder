@@ -18,7 +18,8 @@ export default function App() {
       .catch((e: Error) => setError(e.message));
   }, []);
 
-  useEffect(refresh, [refresh]);
+  // Also on every change of tab: a rebuild may have finished meanwhile.
+  useEffect(refresh, [view, refresh]);
 
   // Send a first-time user to the folder page.
   useEffect(() => {
@@ -54,7 +55,7 @@ export default function App() {
       </header>
       <main className="page">
         {error && <p className="notice error">{error}</p>}
-        {view === "search" && <SearchView status={status} />}
+        {view === "search" && <SearchView status={status} onSearched={refresh} />}
         {view === "folder" && <FolderView status={status} onIndexed={refresh} />}
         {view === "about" && <AboutView status={status} />}
       </main>
@@ -62,7 +63,7 @@ export default function App() {
   );
 }
 
-function SearchView({ status }: { status: Status | null }) {
+function SearchView({ status, onSearched }: { status: Status | null; onSearched: () => void }) {
   const [query, setQuery] = useState("");
   const [response, setResponse] = useState<SearchResponse | null>(null);
   const [searched, setSearched] = useState("");
@@ -77,6 +78,7 @@ function SearchView({ status }: { status: Status | null }) {
     try {
       setResponse(await api.search(query));
       setSearched(query);
+      onSearched();
     } catch (err) {
       setError((err as Error).message);
     } finally {
