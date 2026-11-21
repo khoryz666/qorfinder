@@ -25,7 +25,7 @@ tools, the pinned Rust, Node.js 24, Python 3.14 and Git, and the scoring
 packages into `.venv`:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\tools\setup-windows.ps1 -SkipDocs -WithScoring -Build
+powershell -ExecutionPolicy Bypass -File .\tools\setup-windows.ps1 -WithScoring -Build
 ```
 
 **Elsewhere without Nix**, install the same versions by hand: rustup reads

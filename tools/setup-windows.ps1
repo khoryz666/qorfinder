@@ -1,7 +1,7 @@
 <#
 .SYNOPSIS
     Installs everything needed to develop QorFinder on native Windows 10/11,
-    without Nix, and everything needed to edit the report in doc\ with AI.
+    without Nix.
 
 .DESCRIPTION
     Installs, in order:
@@ -11,18 +11,13 @@
       * Node.js 24.22.3 (the version CI and the release workflow use)
       * Python 3.14 (the version requirements.txt is pinned for)
       * Git for Windows
-      * LibreOffice, Pandoc, Zotero, Java JRE 21, draw.io Desktop
       * optionally VS Code, GitHub CLI, 7-Zip, SumatraPDF
 
     If winget cannot be installed, the script falls back to direct downloads
-    for the compiler, Rust, Node, Python, Git and the document tools.
+    for the compiler, Rust, Node, Python and Git.
 
-    Expect roughly 6 GB of downloads and 15-40 minutes on a fresh machine.
+    Expect several GB of downloads and 15-40 minutes on a fresh machine.
     The script asks for administrator rights once, at the start.
-
-.PARAMETER SkipDocs
-    Do not install the report-editing tools (LibreOffice, Pandoc, Zotero,
-    Java, draw.io).
 
 .PARAMETER WithOptional
     Also install VS Code, GitHub CLI, 7-Zip and SumatraPDF.
@@ -53,7 +48,6 @@
 #>
 [CmdletBinding()]
 param(
-    [switch]$SkipDocs,
     [switch]$WithOptional,
     [switch]$WithScoring,
     [switch]$Build,
@@ -211,7 +205,6 @@ function Restart-Elevated {
         '-File', ('"{0}"' -f $PSCommandPath),
         '-Elevated'
     )
-    if ($SkipDocs) { $arguments += '-SkipDocs' }
     if ($WithOptional) { $arguments += '-WithOptional' }
     if ($WithScoring) { $arguments += '-WithScoring' }
     if ($Build) { $arguments += '-Build' }
@@ -639,91 +632,6 @@ function Set-GitConfig {
     }
 }
 
-# ---------------------------------------------------------------------------
-# Report-editing tools
-# ---------------------------------------------------------------------------
-
-function Install-Zotero {
-    # Zotero is not in the winget community repository, so always use its
-    # official stable download endpoint.
-    try {
-        $exe = Invoke-Download 'https://www.zotero.org/download/client/dl?channel=release&platform=win-x64' 'Zotero-Setup.exe'
-        Invoke-Process -FilePath $exe -Arguments @('/S') -Label 'Install Zotero' -AllowFail
-    }
-    catch { Write-Fail "Zotero: $($_.Exception.Message)" }
-}
-
-function Install-Docs {
-    Write-Step 'Installing the report-editing tools'
-
-    if ($script:HasWinget) {
-        Install-WingetPackage -Id 'TheDocumentFoundation.LibreOffice' -Name 'LibreOffice' | Out-Null
-        Install-WingetPackage -Id 'JohnMacFarlane.Pandoc' -Name 'Pandoc' | Out-Null
-        Install-WingetPackage -Id 'EclipseAdoptium.Temurin.21.JRE' -Name 'Java JRE 21' | Out-Null
-        Install-WingetPackage -Id 'JGraph.Draw' -Name 'draw.io Desktop' | Out-Null
-    }
-    else {
-        Install-DocsDirect
-    }
-
-    Install-Zotero
-
-    $libre = Join-Path $env:ProgramFiles 'LibreOffice\program'
-    if (Test-Path -LiteralPath $libre) { Add-UserPath $libre }
-    $pandoc = Join-Path $env:ProgramFiles 'Pandoc'
-    if (Test-Path -LiteralPath $pandoc) { Add-UserPath $pandoc }
-    Refresh-Path
-}
-
-function Install-DocsDirect {
-    # LibreOffice: the stable directory lists the current version.
-    try {
-        $base = 'https://download.documentfoundation.org/libreoffice/stable/'
-        $html = (Invoke-WebRequest -Uri $base -UseBasicParsing).Content
-        $matches = [regex]::Matches($html, 'href="(\d+\.\d+\.\d+)/"')
-        $versions = @($matches |
-            ForEach-Object { $_.Groups[1].Value } |
-            Sort-Object { [version]$_ } -Descending)
-        if ($versions.Count -gt 0) {
-            $version = $versions[0]
-            $url = "$base$version/win/x86_64/LibreOffice_${version}_Win_x86-64.msi"
-            $msi = Invoke-Download $url "LibreOffice_$version.msi"
-            Invoke-Process -FilePath msiexec.exe -Arguments @(
-                '/i', ('"{0}"' -f $msi), '/qn', '/norestart'
-            ) -Label 'Install LibreOffice' -AllowFail
-        }
-    }
-    catch { Write-Warn "LibreOffice: $($_.Exception.Message)" }
-
-    try {
-        $url = Get-GitHubAssetUrl -Repository 'jgm/pandoc' -Pattern 'windows-x86_64\.msi$'
-        if ($url) {
-            $msi = Invoke-Download $url 'pandoc-windows-x86_64.msi'
-            Invoke-Process -FilePath msiexec.exe -Arguments @(
-                '/i', ('"{0}"' -f $msi), '/qn', '/norestart'
-            ) -Label 'Install Pandoc' -AllowFail
-        }
-    }
-    catch { Write-Warn "Pandoc: $($_.Exception.Message)" }
-
-    try {
-        $msi = Invoke-Download 'https://api.adoptium.net/v3/installer/latest/21/ga/windows/x64/jre/hotspot/normal/eclipse' 'Temurin21-JRE.msi'
-        Invoke-Process -FilePath msiexec.exe -Arguments @(
-            '/i', ('"{0}"' -f $msi), '/qn', '/norestart'
-        ) -Label 'Install Java JRE 21' -AllowFail
-    }
-    catch { Write-Warn "Java JRE 21: $($_.Exception.Message)" }
-
-    try {
-        $url = Get-GitHubAssetUrl -Repository 'jgraph/drawio-desktop' -Pattern 'windows-installer\.exe$'
-        if ($url) {
-            $exe = Invoke-Download $url 'drawio-windows-installer.exe'
-            Invoke-Process -FilePath $exe -Arguments @('/S') -Label 'Install draw.io Desktop' -AllowFail
-        }
-    }
-    catch { Write-Warn "draw.io: $($_.Exception.Message)" }
-}
-
 function Install-Optional {
     Write-Step 'Installing optional tools'
 
@@ -821,16 +729,12 @@ function Show-Summary {
     $cargo = Join-Path $env:USERPROFILE '.cargo\bin\cargo.exe'
     $node = Join-Path $env:ProgramFiles 'nodejs\node.exe'
     $git = Join-Path $env:ProgramFiles 'Git\cmd\git.exe'
-    $soffice = Join-Path $env:ProgramFiles 'LibreOffice\program\soffice.exe'
 
     Write-Info ('rustc / cargo : ' + (Get-VersionLine $cargo @('--version')))
     Write-Info ('node          : ' + (Get-VersionLine $node @('--version')))
     Write-Info ('git           : ' + (Get-VersionLine $git @('--version')))
     if ($script:Python) {
         Write-Info ('python        : ' + (Get-VersionLine $script:Python @('--version')))
-    }
-    if (Test-Path -LiteralPath $soffice) {
-        Write-Info ('libreoffice   : ' + (Get-VersionLine $soffice @('--version')))
     }
     if (Test-VcTools) { Write-Info 'MSVC C++ tools: installed' }
     else { Write-Info 'MSVC C++ tools: NOT FOUND' }
@@ -844,20 +748,12 @@ function Show-Summary {
     Write-Host ''
     Write-Host 'Next steps:' -ForegroundColor Cyan
     Write-Host '  1. Close this window and open a new PowerShell (PATH is now updated).'
-    Write-Host '  2. cd ' + $script:Repo
+    Write-Host ('  2. cd ' + $script:Repo)
     Write-Host '  3. cargo test --workspace'
     Write-Host '  4. cargo test --workspace -- --include-ignored'
     Write-Host '  5. .\target\release\qorfinder.exe serve'
     Write-Host ''
     Write-Host 'If Build Tools asked for a reboot, reboot before step 3.' -ForegroundColor Yellow
-    Write-Host 'The report is in doc\ (not tracked by Git): back it up before AI edits.' -ForegroundColor Yellow
-    Write-Host ''
-    Write-Host 'Report editing with AI:' -ForegroundColor Cyan
-    Write-Host '  backup : Copy-Item doc\23ACB05662_FYP1.odt doc\.backup\23ACB05662_FYP1.before-ai.odt'
-    Write-Host '  read   : New-Item -ItemType Directory -Force doc\.work | Out-Null; pandoc doc\23ACB05662_FYP1.odt --extract-media=doc\.work\media -t gfm --wrap=none -o doc\.work\report.md'
-    Write-Host '  apply  : edit in Writer with Track Changes on, then refresh Zotero and the TOC'
-    Write-Host '  export : & "C:\Program Files\LibreOffice\program\soffice.exe" --headless --convert-to pdf --outdir doc doc\23ACB05662_FYP1.odt'
-    Write-Host '  note   : never convert doc\.work\report.md back to ODT; it loses styles and citations.'
 }
 
 function Show-Plan {
@@ -868,9 +764,6 @@ function Show-Plan {
     Write-Info "Node.js $($script:NodeVersion)"
     Write-Info "Python $($script:PythonVersion)"
     Write-Info 'Git for Windows'
-    if (-not $SkipDocs) {
-        Write-Info 'LibreOffice, Pandoc, Zotero, Java JRE 21, draw.io Desktop'
-    }
     if ($WithOptional) {
         Write-Info 'VS Code, GitHub CLI, 7-Zip, SumatraPDF'
     }
@@ -914,10 +807,6 @@ try {
     $script:Python = Install-Python
     Install-Git
     Set-GitConfig
-
-    if (-not $SkipDocs) {
-        Install-Docs
-    }
 
     if ($WithOptional) {
         Install-Optional
