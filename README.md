@@ -134,12 +134,12 @@ in `models/`; models not fetched are skipped, except the default.
 
 ### 3.3 Commands and options
 
-| Command | What it does |
-|---|---|
-| `index <folder> [--dry-run]` | Extract, chunk and embed every PDF, DOCX and TXT file, replacing the previous index. Bad files are skipped with a reason. `--dry-run` prints every chunk with its offsets and page instead. |
-| `search "<query>" [-k 10]` | Print the top passages with file, page, character range and score. |
-| `eval [--timing] [--kappa 5] [--reindex]` | Run the test queries through BM25, semantic search and RRF and write TREC qrels and runs to `results/eval/`; with `--timing`, time every query against `--index-dir` instead. |
-| `serve [--port 0]` | The browser UI on 127.0.0.1 only; every API call needs the random token in the address it opens. |
+| Command                                   | What it does                                                                                                                                                                                |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `index <folder> [--dry-run]`              | Extract, chunk and embed every PDF, DOCX and TXT file, replacing the previous index. Bad files are skipped with a reason. `--dry-run` prints every chunk with its offsets and page instead. |
+| `search "<query>" [-k 10]`                | Print the top passages with file, page, character range and score.                                                                                                                          |
+| `eval [--timing] [--kappa 5] [--reindex]` | Run the test queries through BM25, semantic search and RRF and write TREC qrels and runs to `results/eval/`; with `--timing`, time every query against `--index-dir` instead.               |
+| `serve [--port 0]`                        | The browser UI on 127.0.0.1 only; every API call needs the random token in the address it opens.                                                                                            |
 
 Global options: `--index-dir` (`QORFINDER_INDEX_DIR`; default
 `qorfinder/index` in the user's local data folder), `--model`
