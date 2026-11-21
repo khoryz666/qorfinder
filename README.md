@@ -190,8 +190,8 @@ Without Nix, `requirements.txt` (scoring) and `requirements-finetune.txt`
 (fine-tuning and reference embeddings) pin the Python packages to the
 flake's versions: `python3 -m pip install -r requirements.txt`.
 
-Regenerating the reference embeddings needs sentence-transformers and PyTorch, which live in a
-separate shell. It writes one file for every model in `models/` to
+Regenerating the reference embeddings needs sentence-transformers and
+PyTorch, which live in a separate shell. It writes one file for every model in `models/` to
 `crates/qf-core/tests/fixtures/reference/`; the test checks each fetched model
 against it and skips the others:
 
@@ -205,10 +205,22 @@ Layout:
 crates/qf-core/   library: ingest, chunk, embed, store, index, search, bm25, fusion, eval
 crates/qf-cli/    the `qorfinder` binary and the local API (serve)
 ui/               React + TypeScript UI, built with Vite to ui/dist
-scripts/          model download, CUAD preparation, scoring, reference embeddings, fine-tuning
+scripts/          model download, CUAD and system-test preparation, scoring, reference embeddings, fine-tuning
+data/testset/     the frozen test set: sampled contracts, categories, spans and the 34 queries
+data/fixtures/    hand-made files the T1 system test must skip (encrypted, scanned, unsupported)
+results/          the six curated result files: effectiveness, per-query scores, tuning,
+                  efficiency, per-query timing, system tests
+tools/            native Windows setup without Nix
 licenses/         licence of the bundled model (Apache-2.0)
 ref/              proposal and IIPSPW report
+.cargo/           links the C runtime statically into the Windows executable
+about.toml        cargo about: which licences are accepted for THIRD_PARTY_LICENSES.html
+about.hbs         its HTML template
 ```
+
+Everything else under `data/` (CUAD, the indexes, the T1/T7 folders, the
+fine-tuning checkpoints), `models/` and `results/eval/` is generated and
+ignored by Git.
 
 ## License
 
