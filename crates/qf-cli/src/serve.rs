@@ -69,11 +69,11 @@ pub struct Job {
 }
 
 /// Indexing progress written into the job for the UI to poll.
-struct JobProgress<'a>(&'a Mutex<Job>);
+struct JobProgress<'a>(&'a App);
 
 impl Progress for JobProgress<'_> {
     fn start(&self, stage: Stage, total: usize) {
-        let mut job = self.0.lock().unwrap();
+        let mut job = self.0.job.lock().unwrap();
         job.stage = Some(match stage {
             Stage::Preparing => "reading",
             Stage::Embedding => "embedding",
@@ -83,7 +83,16 @@ impl Progress for JobProgress<'_> {
     }
 
     fn advance(&self, done: usize) {
-        self.0.lock().unwrap().done += done;
+        self.0.job.lock().unwrap().done += done;
+    }
+
+    /// The old index stays searchable while the new one is built, and is
+    /// closed only now, before the new one replaces it: Windows cannot
+    /// move a folder whose files are open.
+    fn finish(&self, stage: Stage) {
+        if stage == Stage::Embedding {
+            *self.0.searcher.lock().unwrap() = None;
+        }
     }
 }
 
@@ -343,8 +352,8 @@ struct IndexRequest {
     folder: Option<String>,
 }
 
-/// Start indexing in the background. The open index is closed first: on
-/// Windows the new index cannot be swapped in while its files are open.
+/// Start indexing in the background. The open index stays searchable
+/// until the new one is about to replace it.
 async fn start_index(State(app): State<Arc<App>>, Json(req): Json<IndexRequest>) -> Response {
     let folder = match req.folder.filter(|f| !f.trim().is_empty()) {
         Some(folder) => PathBuf::from(folder.trim()),
@@ -382,7 +391,6 @@ async fn start_index(State(app): State<Arc<App>>, Json(req): Json<IndexRequest>)
             ..Job::default()
         };
     }
-    *app.searcher.lock().unwrap() = None;
     tokio::task::spawn_blocking(move || {
         let report = build_index(
             &folder,
@@ -390,7 +398,7 @@ async fn start_index(State(app): State<Arc<App>>, Json(req): Json<IndexRequest>)
             app.embedder,
             &app.tokenizer,
             app.config,
-            &JobProgress(&app.job),
+            &JobProgress(&app),
         );
         app.open_searcher();
         let mut job = app.job.lock().unwrap();
