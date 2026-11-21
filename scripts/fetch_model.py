@@ -15,7 +15,10 @@ e5) to fetch only those; CI sets QF_MODELS=minilm.
 """
 
 import hashlib
+import http.client
+import itertools
 import os
+import socket
 import sys
 import urllib.request
 from pathlib import Path
@@ -63,6 +66,9 @@ SHORT_NAMES = {
     "e5": "intfloat/e5-base-v2",
 }
 MODELS_DIR = Path(__file__).resolve().parent.parent / "models"
+# Seconds to wait for a connection to one address, and for any read.
+CONNECT_TIMEOUT = 5
+READ_TIMEOUT = 60
 
 
 def sha256(path: Path) -> str:
@@ -73,11 +79,47 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def connect(address, timeout=None, source_address=None, **_):
+    """socket.create_connection, but trying IPv6 and IPv4 addresses in turn
+    (RFC 8305) with a short timeout each. Python otherwise tries every IPv6
+    address first and waits for the system's timeout on each, so on a network
+    with broken IPv6 one download hung for over half an hour."""
+    host, port = address
+    infos = socket.getaddrinfo(host, port, 0, socket.SOCK_STREAM)
+    families = [[i for i in infos if i[0] == f] for f in (socket.AF_INET6, socket.AF_INET)]
+    error = OSError(f"no address for {host}")
+    for family, kind, proto, _, addr in filter(None, itertools.chain(*itertools.zip_longest(*families))):
+        sock = socket.socket(family, kind, proto)
+        try:
+            sock.settimeout(CONNECT_TIMEOUT)
+            if source_address:
+                sock.bind(source_address)
+            sock.connect(addr)
+            sock.settimeout(timeout)
+            return sock
+        except OSError as e:
+            error = e
+            sock.close()
+    raise error
+
+
+class Connection(http.client.HTTPSConnection):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._create_connection = connect
+
+
+class Handler(urllib.request.HTTPSHandler):
+    def https_open(self, req):
+        return self.do_open(Connection, req, context=self._context)
+
+
 def fetch(repo: str, revision: str, name: str, dest: Path) -> None:
     url = f"https://huggingface.co/{repo}/resolve/{revision}/{name}"
     tmp = dest.with_suffix(dest.suffix + ".part")
-    print(f"downloading {url}")
-    with urllib.request.urlopen(url) as response, tmp.open("wb") as out:
+    print(f"downloading {url}", flush=True)
+    opener = urllib.request.build_opener(Handler)
+    with opener.open(url, timeout=READ_TIMEOUT) as response, tmp.open("wb") as out:
         while block := response.read(1 << 20):
             out.write(block)
     tmp.replace(dest)
