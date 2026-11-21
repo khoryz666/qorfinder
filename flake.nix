@@ -11,7 +11,8 @@
   };
 
   outputs = { self, nixpkgs, flake-utils, rust-overlay }:
-    flake-utils.lib.eachDefaultSystem (system:
+    # x86_64 Linux only: the one Nix platform CI and the release build and test.
+    flake-utils.lib.eachSystem [ "x86_64-linux" ] (system:
       let
         pkgs = import nixpkgs {
           inherit system;

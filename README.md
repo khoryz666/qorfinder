@@ -12,7 +12,7 @@ your way around, and rerunning every test and measurement recorded in
 
 ## 1. Set up
 
-**With Nix** (Linux, macOS; flakes enabled). Every tool comes from the locked
+**With Nix** (x86_64 Linux; flakes enabled). Every tool comes from the locked
 flake, so there is nothing else to install:
 
 ```bash
@@ -31,8 +31,10 @@ powershell -ExecutionPolicy Bypass -File .\tools\setup-windows.ps1 -WithScoring 
 **Elsewhere without Nix**, install the same versions by hand: rustup reads
 `rust-toolchain.toml`, `ui/package.json` asks for Node.js 24, and
 `requirements.txt` (scoring) and `requirements-finetune.txt` (fine-tuning)
-pin the Python packages to the flake's (`python3 -m pip install -r
-requirements.txt`; ranx also pulls in `ir_datasets`, which is never used).
+pin the Python packages the scripts import to the flake's versions and leave
+their dependencies to pip (`python3 -m pip install -r requirements.txt`; ranx
+also pulls in `ir_datasets`, which is never used). Node.js 24.19.0 and Python
+3.14.7 are the flake's versions, which CI and the release workflow pin too.
 
 Then fetch the model and build:
 
