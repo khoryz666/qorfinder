@@ -76,10 +76,15 @@
         };
 
         # `nix develop .#reference` regenerates the reference embeddings
-        # with sentence-transformers (pulls in PyTorch, so kept separate).
+        # and fine-tunes MiniLM: PyTorch, transformers and
+        # sentence-transformers, kept separate for their size.
         devShells.reference = pkgs.mkShell {
           packages = [
-            (pkgs.python3.withPackages (ps: [ ps.sentence-transformers ]))
+            (pkgs.python3.withPackages (ps: [
+              ps.torch
+              ps.transformers
+              ps.sentence-transformers
+            ]))
           ];
         };
       });
