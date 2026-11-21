@@ -563,7 +563,9 @@ def tune_learning_rate(train_contracts: list[dict], val_contracts: list[dict]) -
     training split and return the one with the lowest validation loss.
     Epochs, batch size, temperature and sequence length stay at the
     standard values above and are not swept. Each rate's result is appended
-    to TUNING_TSV as it finishes, so a rerun only trains the missing ones."""
+    to TUNING_TSV as it finishes. The rates share one random stream, seeded
+    once, as in the run that chose the reported rate, so a rerun reuses the
+    table only when every rate is in it and otherwise trains them all again."""
     train_pairs = build_pairs(train_contracts, TUNE_MAX_PAIRS_PER_CATEGORY)
     val_pairs = build_pairs(val_contracts, TUNE_MAX_PAIRS_PER_CATEGORY)
     log(
@@ -575,13 +577,14 @@ def tune_learning_rate(train_contracts: list[dict], val_contracts: list[dict]) -
         for line in TUNING_TSV.read_text(encoding="utf-8").splitlines()[1:]:
             lr, loss, acc = line.split("\t")
             done[float(lr)] = (float(loss), float(acc))
-    else:
+    if set(done) != set(TUNE_LEARNING_RATES):
+        done = {}
         TUNING_TSV.write_text("lr\tval_loss\tval_acc@1\n", encoding="utf-8")
 
     steps = max(1, math.ceil(len(train_pairs) / BATCH_SIZE))
+    seed_everything()
     for lr in TUNE_LEARNING_RATES:
         if lr not in done:
-            seed_everything()
             model, tokenizer = load_base_model()
             model.train()
             optimizer = torch.optim.AdamW(model.parameters(), lr=lr)
