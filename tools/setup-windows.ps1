@@ -9,7 +9,7 @@
       * Visual Studio 2022 Build Tools with the C++ workload (MSVC linker)
       * rustup + Rust 1.96.0 (the version pinned by rust-toolchain.toml)
       * Node.js 24.22.3 (the version CI and the release workflow use)
-      * Python 3.12
+      * Python 3.14 (the version requirements.txt is pinned for)
       * Git for Windows
       * LibreOffice, Pandoc, Zotero, Java JRE 21, draw.io Desktop
       * optionally VS Code, GitHub CLI, 7-Zip, SumatraPDF
@@ -78,7 +78,7 @@ $script:HasWinget = $false
 $script:Python = $null
 $script:ElevatedRun = $Elevated.IsPresent
 $script:NodeVersion = '24.22.3'
-$script:PythonVersion = '3.12.10'
+$script:PythonVersion = '3.14.7'
 
 # ---------------------------------------------------------------------------
 # Output helpers
@@ -502,7 +502,7 @@ function Find-Python {
     $launcher = Get-Command py.exe -ErrorAction SilentlyContinue
     if ($launcher) {
         try {
-            $path = (& py.exe -3.12 -c "import sys; print(sys.executable)") 2>$null
+            $path = (& py.exe -3.14 -c "import sys; print(sys.executable)") 2>$null
             if ($LASTEXITCODE -eq 0 -and $path) { return $path.Trim() }
         }
         catch { }
@@ -512,14 +512,14 @@ function Find-Python {
     if ($onPath -and $onPath.Source -notlike '*\WindowsApps\*') {
         try {
             $check = (& $onPath.Source -c "import sys; print('%d.%d' % sys.version_info[:2])") 2>$null
-            if ($LASTEXITCODE -eq 0 -and $check -eq '3.12') { return $onPath.Source }
+            if ($LASTEXITCODE -eq 0 -and $check -eq '3.14') { return $onPath.Source }
         }
         catch { }
     }
 
     $candidates = @(
-        (Join-Path $env:LOCALAPPDATA 'Programs\Python\Python312\python.exe'),
-        (Join-Path $env:ProgramFiles 'Python312\python.exe')
+        (Join-Path $env:LOCALAPPDATA 'Programs\Python\Python314\python.exe'),
+        (Join-Path $env:ProgramFiles 'Python314\python.exe')
     )
     foreach ($candidate in $candidates) {
         if (Test-Path -LiteralPath $candidate) { return $candidate }
@@ -536,20 +536,20 @@ function Install-PythonDirect {
         'PrependPath=1',
         'Include_launcher=1',
         'Include_test=0'
-    ) -Label 'Install Python 3.12'
+    ) -Label 'Install Python 3.14'
 }
 
 function Install-Python {
     $found = Find-Python
     if ($found) {
-        Write-Ok "Python 3.12 is already installed: $found"
+        Write-Ok "Python 3.14 is already installed: $found"
         return $found
     }
 
     Write-Step "Installing Python $($script:PythonVersion)"
     if ($script:HasWinget) {
         try {
-            Install-WingetPackage -Id 'Python.Python.3.12' -Name 'Python 3.12' -Required | Out-Null
+            Install-WingetPackage -Id 'Python.Python.3.14' -Name 'Python 3.14' -Required | Out-Null
         }
         catch {
             Write-Warn "winget failed: $($_.Exception.Message)"
@@ -563,11 +563,11 @@ function Install-Python {
     Refresh-Path
     $found = Find-Python
     if (-not $found) {
-        $fallback = Join-Path $env:LOCALAPPDATA 'Programs\Python\Python312\python.exe'
+        $fallback = Join-Path $env:LOCALAPPDATA 'Programs\Python\Python314\python.exe'
         if (Test-Path -LiteralPath $fallback) { $found = $fallback }
     }
     if (-not $found) {
-        throw 'Python 3.12 was not found after installation.'
+        throw 'Python 3.14 was not found after installation.'
     }
 
     $pythonDir = Split-Path -Parent $found
@@ -759,38 +759,16 @@ function Install-Scoring {
     }
 
     Invoke-Process -FilePath $venvPython -Arguments @('-m', 'pip', 'install', '--upgrade', 'pip') -Label 'Upgrade pip'
-    Invoke-Process -FilePath $venvPython -Arguments @(
-        '-m', 'pip', 'install',
-        'numpy==1.26.4',
-        'numba==0.61.2',
-        'pandas<3',
-        'scipy',
-        'cbor2',
-        'fastparquet',
-        'lz4',
-        'orjson',
-        'pyyaml',
-        'rich',
-        'seaborn',
-        'tabulate',
-        'tqdm'
-    ) -Label 'Install ranx dependencies'
-    Invoke-Process -FilePath $venvPython -Arguments @(
-        '-m', 'pip', 'install', '--no-deps', 'ranx==0.3.21'
-    ) -Label 'Install ranx (without ir_datasets)'
 
-    # flake.nix makes Qrels.from_ir_datasets import ir_datasets lazily. Do the
-    # same here so the Windows install does not need trec-car-tools.
-    $qrels = Join-Path $venv 'Lib\site-packages\ranx\data_structures\qrels.py'
-    if (Test-Path -LiteralPath $qrels) {
-        try {
-            $source = [IO.File]::ReadAllText($qrels)
-            $source = $source -replace "(?m)^import ir_datasets\r?\n", ''
-            $source = $source -replace 'qrels = Qrels\.from_dict\(ir_datasets', "import ir_datasets`r`n`r`n        qrels = Qrels.from_dict(ir_datasets"
-            [IO.File]::WriteAllText($qrels, $source)
-            Write-Ok 'ranx patched for Windows (lazy ir_datasets import)'
-        }
-        catch { Write-Warn "Could not patch ranx: $($_.Exception.Message)" }
+    # The versions in requirements.txt, installed as the Windows CI job does.
+    Write-Step 'Install the scoring packages (requirements.txt)'
+    try {
+        & (Join-Path $script:Repo 'tools\install-scoring.ps1') -Python $venvPython
+        Write-Ok 'scoring packages installed'
+    }
+    catch {
+        Write-Fail "scoring packages: $($_.Exception.Message)"
+        return
     }
 
     Invoke-Process -FilePath $venvPython -Arguments @(
