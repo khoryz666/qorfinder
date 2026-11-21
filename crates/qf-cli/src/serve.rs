@@ -412,6 +412,12 @@ async fn start_index(State(app): State<Arc<App>>, Json(req): Json<IndexRequest>)
                     report.chunks,
                     report.total_time.as_secs_f64()
                 ));
+                if let Some(warning) = &report.cleanup_warning {
+                    job.message = job
+                        .message
+                        .take()
+                        .map(|m| format!("{m} The previous index could not be deleted: {warning}"));
+                }
                 job.skipped = report
                     .skipped
                     .iter()
