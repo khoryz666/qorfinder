@@ -7,9 +7,11 @@
     Installs, in order:
       * App Installer (winget) if it is missing
       * Visual Studio 2022 Build Tools with the C++ workload (MSVC linker)
-      * rustup + Rust 1.96.0 (the version pinned by rust-toolchain.toml)
-      * Node.js 24.22.3 (the version CI and the release workflow use)
-      * Python 3.14 (the version requirements.txt is pinned for)
+      * rustup + the Rust version pinned by rust-toolchain.toml
+      * Node.js 24.19.0 and Python 3.14.7, the versions of flake.nix, CI and
+        the release workflow
+      Each step is skipped when its version is already installed, so the
+      script can be run again safely.
       * Git for Windows
       * optionally VS Code, GitHub CLI, 7-Zip, SumatraPDF
 
@@ -71,8 +73,11 @@ $script:Failures = @()
 $script:HasWinget = $false
 $script:Python = $null
 $script:ElevatedRun = $Elevated.IsPresent
-$script:NodeVersion = '24.22.3'
+# The flake's versions; CI and the release workflow pin the same.
+$script:NodeVersion = '24.19.0'
 $script:PythonVersion = '3.14.7'
+$script:RustVersion = (Select-String -LiteralPath (Join-Path $script:Repo 'rust-toolchain.toml') `
+    -Pattern '^channel\s*=\s*"([^"]+)"').Matches[0].Groups[1].Value
 
 # ---------------------------------------------------------------------------
 # Output helpers
@@ -446,81 +451,89 @@ function Install-Rust {
         -Arguments @('set', 'default-host', 'x86_64-pc-windows-msvc') `
         -Label 'Select the MSVC host'
 
-    # rust-toolchain.toml pins 1.96.0; install it explicitly so failures are visible.
+    # Install the rust-toolchain.toml version explicitly so failures are visible.
     Invoke-Process -FilePath rustup.exe -Arguments @(
-        'toolchain', 'install', '1.96.0',
+        'toolchain', 'install', $script:RustVersion,
         '--profile', 'minimal',
         '--component', 'rustfmt',
         '--component', 'clippy'
-    ) -Label 'Install Rust 1.96.0 with rustfmt and clippy'
+    ) -Label "Install Rust $($script:RustVersion) with rustfmt and clippy"
 }
 
-function Test-Node {
-    $node = Get-Command node.exe -ErrorAction SilentlyContinue
-    if (-not $node) { return $false }
-    $version = (& node.exe --version) 2>$null
-    if ($version -match '^v(\d+)\.') {
-        $script:NodeMajor = [int]$Matches[1]
-        return ($script:NodeMajor -ge 22)
-    }
-    return $false
+function Get-NodeVersion {
+    if (-not (Get-Command node.exe -ErrorAction SilentlyContinue)) { return $null }
+    try { return ((& node.exe --version) 2>$null).Trim().TrimStart('v') }
+    catch { return $null }
 }
 
 function Install-Node {
-    if (Test-Node) {
-        if ($script:NodeMajor -ne 24) {
-            Write-Warn "Node $($script:NodeMajor) is installed; CI and the release workflow use Node 24."
-            Write-Warn 'Vite 8 needs Node 22.12 or newer, so this should still work.'
-        }
-        else {
-            Write-Ok 'Node 24 is already installed'
-        }
+    $current = Get-NodeVersion
+    if ($current -eq $script:NodeVersion) {
+        Write-Ok "Node.js $current is already installed"
         return
     }
+    if ($current) { Write-Info "Node.js $current is installed; replacing it with $($script:NodeVersion)" }
 
     Write-Step "Installing Node.js $($script:NodeVersion)"
     $url = "https://nodejs.org/dist/v$($script:NodeVersion)/node-v$($script:NodeVersion)-x64.msi"
     $msi = Invoke-Download $url "node-v$($script:NodeVersion)-x64.msi"
     Invoke-Process -FilePath msiexec.exe -Arguments @(
         '/i', ('"{0}"' -f $msi), '/qn', '/norestart'
-    ) -Label 'Install Node.js'
+    ) -Label 'Install Node.js' -AllowFail | Out-Null
 
     Refresh-Path
     $nodeDir = Join-Path $env:ProgramFiles 'nodejs'
     Add-UserPath $nodeDir
     Refresh-Path
+    $current = Get-NodeVersion
+    if ($current -ne $script:NodeVersion) {
+        throw "Node.js $($script:NodeVersion) is needed, found $current; uninstall that Node.js and rerun this script."
+    }
 }
 
+function Get-PythonVersion {
+    param([string]$Path)
+    try {
+        $version = (& $Path -c "import platform; print(platform.python_version())") 2>$null
+        if ($LASTEXITCODE -eq 0 -and $version) { return $version.Trim() }
+    }
+    catch { }
+    return $null
+}
+
+# The pinned Python, wherever it is installed, or $null.
 function Find-Python {
-    $launcher = Get-Command py.exe -ErrorAction SilentlyContinue
-    if ($launcher) {
+    $candidates = @()
+    if (Get-Command py.exe -ErrorAction SilentlyContinue) {
         try {
             $path = (& py.exe -3.14 -c "import sys; print(sys.executable)") 2>$null
-            if ($LASTEXITCODE -eq 0 -and $path) { return $path.Trim() }
+            if ($LASTEXITCODE -eq 0 -and $path) { $candidates += $path.Trim() }
         }
         catch { }
     }
-
     $onPath = Get-Command python.exe -ErrorAction SilentlyContinue
-    if ($onPath -and $onPath.Source -notlike '*\WindowsApps\*') {
-        try {
-            $check = (& $onPath.Source -c "import sys; print('%d.%d' % sys.version_info[:2])") 2>$null
-            if ($LASTEXITCODE -eq 0 -and $check -eq '3.14') { return $onPath.Source }
-        }
-        catch { }
-    }
-
-    $candidates = @(
+    if ($onPath -and $onPath.Source -notlike '*\WindowsApps\*') { $candidates += $onPath.Source }
+    $candidates += @(
         (Join-Path $env:LOCALAPPDATA 'Programs\Python\Python314\python.exe'),
         (Join-Path $env:ProgramFiles 'Python314\python.exe')
     )
     foreach ($candidate in $candidates) {
-        if (Test-Path -LiteralPath $candidate) { return $candidate }
+        if ((Test-Path -LiteralPath $candidate) -and (Get-PythonVersion $candidate) -eq $script:PythonVersion) {
+            return $candidate
+        }
     }
     return $null
 }
 
-function Install-PythonDirect {
+function Install-Python {
+    $found = Find-Python
+    if ($found) {
+        Write-Ok "Python $($script:PythonVersion) is already installed: $found"
+        return $found
+    }
+
+    # python.org's installer, not winget, which installs the newest 3.14.x.
+    Write-Step "Installing Python $($script:PythonVersion)"
     $url = "https://www.python.org/ftp/python/$($script:PythonVersion)/python-$($script:PythonVersion)-amd64.exe"
     $exe = Invoke-Download $url "python-$($script:PythonVersion)-amd64.exe"
     Invoke-Process -FilePath $exe -Arguments @(
@@ -529,38 +542,12 @@ function Install-PythonDirect {
         'PrependPath=1',
         'Include_launcher=1',
         'Include_test=0'
-    ) -Label 'Install Python 3.14'
-}
-
-function Install-Python {
-    $found = Find-Python
-    if ($found) {
-        Write-Ok "Python 3.14 is already installed: $found"
-        return $found
-    }
-
-    Write-Step "Installing Python $($script:PythonVersion)"
-    if ($script:HasWinget) {
-        try {
-            Install-WingetPackage -Id 'Python.Python.3.14' -Name 'Python 3.14' -Required | Out-Null
-        }
-        catch {
-            Write-Warn "winget failed: $($_.Exception.Message)"
-            Install-PythonDirect
-        }
-    }
-    else {
-        Install-PythonDirect
-    }
+    ) -Label "Install Python $($script:PythonVersion)" -AllowFail | Out-Null
 
     Refresh-Path
     $found = Find-Python
     if (-not $found) {
-        $fallback = Join-Path $env:LOCALAPPDATA 'Programs\Python\Python314\python.exe'
-        if (Test-Path -LiteralPath $fallback) { $found = $fallback }
-    }
-    if (-not $found) {
-        throw 'Python 3.14 was not found after installation.'
+        throw "Python $($script:PythonVersion) was not found after installation; if another 3.14.x is installed, uninstall it and rerun this script."
     }
 
     $pythonDir = Split-Path -Parent $found
@@ -662,6 +649,10 @@ function Install-Scoring {
     Write-Step 'Creating the Python scoring environment (.venv)'
     $venv = Join-Path $script:Repo '.venv'
     $venvPython = Join-Path $venv 'Scripts\python.exe'
+    if ((Test-Path -LiteralPath $venvPython) -and (Get-PythonVersion $venvPython) -ne $script:PythonVersion) {
+        Write-Info ".venv was made with another Python; recreating it with $($script:PythonVersion)"
+        Remove-Item -LiteralPath $venv -Recurse -Force
+    }
     if (-not (Test-Path -LiteralPath $venvPython)) {
         Invoke-Process -FilePath $script:Python -Arguments @('-m', 'venv', $venv) -Label 'Create .venv'
     }
@@ -699,8 +690,13 @@ function Build-Repo {
     Push-Location $script:Repo
     try {
         Invoke-Process -FilePath 'cargo.exe' -Arguments @('build', '--release') -Label 'cargo build --release'
+        # The default model, as CI fetches it; files already there are only checked.
+        if (-not $script:Python) { $script:Python = Find-Python }
+        $env:QF_MODELS = 'minilm'
+        Invoke-Process -FilePath $script:Python -Arguments @('scripts\fetch_model.py') -Label 'Fetch the model'
     }
     finally {
+        Remove-Item Env:QF_MODELS -ErrorAction SilentlyContinue
         Pop-Location
     }
 }
@@ -749,7 +745,7 @@ function Show-Summary {
     Write-Host 'Next steps:' -ForegroundColor Cyan
     Write-Host '  1. Close this window and open a new PowerShell (PATH is now updated).'
     Write-Host ('  2. cd ' + $script:Repo)
-    Write-Host '  3. cargo test --workspace'
+    Write-Host '  3. $env:QF_MODELS = "minilm"; python scripts\fetch_model.py   (done by -Build)'
     Write-Host '  4. cargo test --workspace -- --include-ignored'
     Write-Host '  5. .\target\release\qorfinder.exe serve'
     Write-Host ''
@@ -760,7 +756,7 @@ function Show-Plan {
     Write-Step 'Dry run: nothing will be installed'
     Write-Info 'winget (App Installer) if missing'
     Write-Info 'Visual Studio 2022 Build Tools + Desktop development with C++'
-    Write-Info 'rustup + Rust 1.96.0 (rustfmt, clippy)'
+    Write-Info "rustup + Rust $($script:RustVersion) (rustfmt, clippy)"
     Write-Info "Node.js $($script:NodeVersion)"
     Write-Info "Python $($script:PythonVersion)"
     Write-Info 'Git for Windows'
@@ -771,7 +767,7 @@ function Show-Plan {
         Write-Info 'Python .venv with ranx/scipy (only needed to re-score results)'
     }
     if ($Build) {
-        Write-Info 'npm ci + npm run build + cargo build --release'
+        Write-Info 'npm ci + npm run build + cargo build --release + fetch the default model'
     }
     Write-Info ''
     Write-Info 'Run without -DryRun to install.'
