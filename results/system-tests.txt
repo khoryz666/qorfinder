@@ -1,5 +1,6 @@
-System tests of release v0.0.0 on the testing machine (T1, T5, T7, T8, T12, serve token checks).
-Records from one Windows machine, kept verbatim, so paths read C:\Users\...
+System tests of release v0.0.0 (T1, T5, T7, T8, T11, T12, T13, serve token checks).
+Records kept verbatim. Up to T12 they come from the Windows testing machine, so paths read C:\Users\...;
+the last section is the Linux zip on the development machine and the CI run for T13.
 
 ==============================================================================
 T1: index a mixed folder, skipping bad files with a reason
@@ -414,3 +415,115 @@ Result: 20 of 20 found on the reported page and on no other page.
     DigitalCinemaDestinationsCorp_20111220_S-1_EX-10.10_7346719_EX-10.10_Affiliate Agreement.pdf · page 13 · characters 38077-39111
     starts: "Section 3.12 License. NCM hereby grants to Network Affiliate at no cost ..."
     check: found on page 13 only (ok)
+
+==============================================================================
+T11, T1, T5 and T8: the Linux zip on Linux Mint
+measures: the zip runs as unpacked, outside Nix, and loads only system libraries; T1 and T5 pass;
+          indexing and search work with no network adapter; the process only uses 127.0.0.1
+commit:   release zip qorfinder-v0.0.0-linux-x86_64.zip (tag v0.0.0 = 13625c1), downloaded from the
+          GitHub release on 21 Nov 2026, sha256 31f646f0c416e09e4d9676c882f4eafd1f04e5145603874286b1889fb9343bdd
+machine:  Lenovo ThinkPad E14 Gen 3 (development machine), Linux Mint 22.3, glibc 2.39-0ubuntu8.12
+commands: every run below used `env -i PATH=/usr/bin:/bin HOME=$HOME`, so nothing from the Nix shell was on
+          the PATH; `unshare -rn` runs a command in a new network namespace, whose only interface is the
+          loopback (down unless set up), so no network adapter exists for it; `strace -f -e trace=%network`
+          records every network system call of the process and its threads
+
+== 1. libraries (T11)
+$ readelf -d qorfinder | grep NEEDED
+ 0x0000000000000001 (NEEDED)             Shared library: [libgcc_s.so.1]
+ 0x0000000000000001 (NEEDED)             Shared library: [libm.so.6]
+ 0x0000000000000001 (NEEDED)             Shared library: [libc.so.6]
+ 0x0000000000000001 (NEEDED)             Shared library: [ld-linux-x86-64.so.2]
+$ readelf -l qorfinder | grep interpreter
+      [Requesting program interpreter: /lib64/ld-linux-x86-64.so.2]
+$ readelf -V qorfinder | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -1
+GLIBC_2.39
+$ /usr/bin/ldd qorfinder
+	libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1
+	libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6
+	libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6
+	/lib64/ld-linux-x86-64.so.2
+no RPATH or RUNPATH; every library resolves to the system's /lib/x86_64-linux-gnu.
+
+== 2. index with no network adapter (T1, T8)
+$ unshare -rn sh -c 'ip -brief link; strace -f -e trace=%network -o index.strace qorfinder --index-dir <tmp> index data/t1-mixed'
+lo               DOWN           00:00:00:00:00:00 <LOOPBACK>
+skipped .../data/t1-mixed/fees.xlsx: unsupported file type
+skipped .../data/t1-mixed/corrupt.pdf: cannot parse file: failed parsing cross reference table: invalid start value
+skipped .../data/t1-mixed/encrypted.pdf: encrypted
+skipped .../data/t1-mixed/over-50mb.txt: file is 54449696 bytes, over the 52428800 byte limit
+skipped .../data/t1-mixed/scanned.pdf: no text layer
+indexed 29 document(s), 2011 chunk(s), 5 skipped, in 89.0 s (prepare 0.3 s, embed 88.6 s, 22.7 chunks/s)
+peak memory 1357.1 MB
+index.strace: 0 lines (no network system call at all)
+The folder is the rebuilt one described in T1 (9 DOCX), hence 29 documents and 2011 chunks, not 30 and 2029.
+
+== 3. search with no network adapter (T5, T8)
+$ unshare -rn sh -c 'strace -f -e trace=%network -o search.strace qorfinder --index-dir <tmp> search "which state'"'"'s law governs this agreement"'
+ 1. 0.651  ADIANUTRITION,INC_04_01_2005-EX-10.D2-RESELLER AGREEMENT.docx
+           .../data/t1-mixed · characters 24893–25692
+           6.7 GOVERNING LAW. This Agreement shall be governed by and construed
+           under the laws of the State of California, ...
+ 2. 0.598  CybergyHoldingsInc_20140520_10-Q_EX-10.27_8605784_EX-10.27_Affiliate Agreement.pdf
+           .../data/t1-mixed · characters 28684–29246 · page 13
+search.strace: 0 lines
+
+The same through the UI's API, in a namespace whose only interface is the loopback, set up:
+$ unshare -rn sh -c 'ip link set lo up; qorfinder --index-dir <tmp> serve & ...; curl .../api/search?q=...; curl https://github.com'
+lo               UNKNOWN        00:00:00:00:00:00 <LOOPBACK,UP,LOWER_UP>
+/api/search -> rank 1 ADIANUTRITION ... RESELLER AGREEMENT.docx, characters 24893-25692, score 0.651
+curl https://github.com -> Could not resolve host: github.com
+
+== 4. serve: tokens, Host header and Open file (T5, T8)
+$ qorfinder --index-dir <tmp> serve
+QorFinder is running at http://127.0.0.1:43955/?token=<32 hex digits>
+GET /?token=...                                       -> 200
+GET /api/status        without token header           -> 403
+GET /api/status        with token, Host: evil.example -> 403
+GET /api/status        with token, Host: localhost:43955 -> 403
+GET /api/status        with token                     -> ready, 29 documents, 2011 chunks
+GET /api/search?q=can the affiliate keep earning commission after the agreement ends?&k=2
+    -> rank 1 UsioInc_20040428_SB-2_EX-10.11_1723988_EX-10.11_Affiliate Agreement 2.pdf, page 4, chunk 2002,
+       "Section 5.02 [TERMINATION]A, Network 1 shall continue to pay to the Affiliate ..."
+GET /api/search?q=which state's law governs this agreement&k=2
+    -> rank 1 ADIANUTRITION,INC_04_01_2005-EX-10.D2-RESELLER AGREEMENT.docx, chunk 444
+POST /api/open {"chunk_id":2002} -> 204; the PDF opened in Xreader, the default PDF viewer
+POST /api/open {"chunk_id":444}  -> 204; the DOCX opened in LibreOffice Writer
+$ pdftotext -f 4 -l 4 "UsioInc_..._Affiliate Agreement 2.pdf" - | grep -c 5.02
+3
+(The open requests are the calls the UI's Open file button makes.)
+
+== 5. network traffic of a normal session (T8)
+$ BROWSER=true strace -f -e trace=%network -o serve.strace qorfinder --index-dir <tmp> serve
+then, through the API: the page, status, a search, a rebuild of the index (POST /api/index, 29 documents,
+2011 chunks, 89 s), status, another search, then Ctrl+C.
+BROWSER=true keeps the browser out of the trace; Open file is left out for the same reason, because the
+viewer it starts is traced with -f as a child (section 4 shows it working).
+serve.strace: 317 lines from 3 processes (the server, its threads, and the `true` started as the browser)
+  1 socket(AF_INET, SOCK_STREAM|SOCK_CLOEXEC|SOCK_NONBLOCK, IPPROTO_IP) = 10
+  1 bind(10, {sa_family=AF_INET, sin_port=htons(0), sin_addr=inet_addr("127.0.0.1")}, 16) = 0
+  1 listen(10, 128) = 0
+ 51 accept4(10, {sa_family=AF_INET, sin_port=htons(<port>), sin_addr=inet_addr("127.0.0.1")}, ...)
+  0 connect
+every other line is a read, write or shutdown on those sockets or on a local socketpair; no AF_INET6, no
+address other than 127.0.0.1.
+
+==============================================================================
+T13: build and test on a fresh machine with Nix
+measures: the shell is made from the locked flake alone, and the project builds and its tests pass
+commit:   540a865, the parent of the v0.0.0 tag 13625c1, which adds only results/2026-11-17-540a865-t590/
+machine:  fresh GitHub Actions runner, ubuntu-latest, Nix installed by cachix/install-nix-action v27
+run:      https://github.com/khoryz666/qorfinder/actions/runs/44122646263, job "linux" (134177877802),
+          17 Nov 2026 16:10:13-16:12:35 UTC, conclusion success
+commands: each step runs `nix develop --ignore-environment --keep HOME --command ...`, so only tools from the
+          flake are on the PATH:
+          cargo fmt --all -- --check                              success
+          cargo clippy --workspace --all-targets -- -D warnings   success
+          python3 scripts/fetch_model.py (QF_MODELS=minilm)       success
+          cargo test --workspace -- --include-ignored             success (builds the workspace first)
+          python3 scripts/test_score.py                           success
+          cd ui && npm ci && npm run build                        success
+The job restores Cargo's target/ folder and the model from the Actions cache (Swatinem/rust-cache,
+actions/cache), so some crates may not have been recompiled; Nix and every tool come fresh from the
+locked flake. Steps from the GitHub API (/actions/runs/44122646263/jobs); the full logs need a signed-in
+account.
