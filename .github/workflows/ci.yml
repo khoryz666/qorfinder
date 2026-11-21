@@ -5,6 +5,11 @@ on:
     branches: ["**"]
   pull_request:
 
+# Both jobs run the same checks in the same order: formatting, lint,
+# release build, the tests (with the model), the scoring check and the UI
+# build. Linux takes every tool from the flake; Windows has no Nix, so it
+# takes the same versions from rust-toolchain.toml, requirements.txt and
+# Node.js 24.
 jobs:
   linux:
     name: linux
@@ -27,6 +32,12 @@ jobs:
       - name: Check formatting
         run: nix develop --ignore-environment --keep HOME --command cargo fmt --all -- --check
 
+      - name: Lint
+        run: nix develop --ignore-environment --keep HOME --command cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Build (release)
+        run: nix develop --ignore-environment --keep HOME --command cargo build --release
+
       # The model is pinned by revision and SHA-256 in fetch_model.py, so the
       # cache key changes exactly when the model does.
       - name: Cache the model
@@ -34,9 +45,6 @@ jobs:
         with:
           path: models
           key: model-${{ hashFiles('scripts/fetch_model.py') }}
-
-      - name: Lint
-        run: nix develop --ignore-environment --keep HOME --command cargo clippy --workspace --all-targets -- -D warnings
 
       - name: Fetch the model
         run: nix develop --ignore-environment --keep HOME --keep QF_MODELS --command python3 scripts/fetch_model.py
@@ -60,20 +68,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # rustup is preinstalled on the runner and picks up rust-toolchain.toml.
+      # rustup is preinstalled on the runner and picks up rust-toolchain.toml,
+      # with its rustfmt and clippy.
       - name: Cache cargo artifacts
         uses: Swatinem/rust-cache@v2
 
-      # The model is pinned by revision and SHA-256 in fetch_model.py, so the
-      # cache key changes exactly when the model does.
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+
+      - name: Lint
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Build (release)
+        run: cargo build --release
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
       - name: Cache the model
         uses: actions/cache@v4
         with:
           path: models
           key: model-${{ hashFiles('scripts/fetch_model.py') }}
-
-      - name: Build (release)
-        run: cargo build --release
 
       - name: Fetch the model
         run: python scripts/fetch_model.py
@@ -82,3 +99,30 @@ jobs:
 
       - name: Test
         run: cargo test --workspace -- --include-ignored
+
+      # As in flake.nix: ranx without ir_datasets, whose one use
+      # (Qrels.from_ir_datasets) becomes a lazy import.
+      - name: Install the scoring packages
+        shell: pwsh
+        run: |
+          Get-Content requirements.txt | Where-Object { $_ -notmatch '^ranx==' } | Set-Content scoring-deps.txt
+          python -m pip install -r scoring-deps.txt
+          python -m pip install --no-deps (Select-String -Path requirements.txt -Pattern '^ranx==').Line
+          $site = python -c "import sysconfig; print(sysconfig.get_paths()['purelib'])"
+          $qrels = Join-Path $site 'ranx/data_structures/qrels.py'
+          $source = (Get-Content -Raw $qrels) -replace "(?m)^import ir_datasets\r?\n", ''
+          $source = $source.Replace(
+            '        qrels = Qrels.from_dict(ir_datasets',
+            "        import ir_datasets`n`n        qrels = Qrels.from_dict(ir_datasets")
+          Set-Content -NoNewline -Path $qrels -Value $source
+
+      - name: Check the scoring script
+        run: python scripts/score.py
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Type-check and build the UI
+        run: npm ci && npm run build
+        working-directory: ui
