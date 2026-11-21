@@ -64,12 +64,13 @@
       {
         devShells.default = pkgs.mkShell {
           # mkShell's stdenv provides the C compiler that rusqlite (bundled
-          # SQLite) and tokenizers (onig) need. nodejs builds the browser UI.
+          # SQLite) and tokenizers (onig) need. Node.js 24, the major version
+          # the release workflow uses, builds the browser UI.
           # Python runs the data-prep and scoring scripts.
           packages = [
             rust
             pkgs.pkg-config
-            pkgs.nodejs
+            pkgs.nodejs_24
             (pkgs.python3.withPackages (ps: [ (ranx ps) ps.scipy ]))
           ];
         };
