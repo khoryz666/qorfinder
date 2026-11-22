@@ -98,6 +98,8 @@ def load_contracts(cuad_json: Path) -> tuple[list[dict], dict[str, str]]:
         contracts.append(
             {"title": doc["title"], "context": context, "spans": spans}
         )
+    checked = sum(len(v) for c in contracts for v in c["spans"].values())
+    print(f"checked {checked} annotations: each matches the text at its position")
     return contracts, descriptions
 
 
