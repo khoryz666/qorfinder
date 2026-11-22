@@ -64,10 +64,10 @@
   <h2 class="reveal">Trained on contracts</h2>
   <p class="sub reveal">The default model was fine-tuned on clauses from 480 public contracts. On 34 test questions over
     30 other contracts, it ranked the right clauses far better than keyword search or the general model.</p>
-  <div class="chart reveal" role="img" aria-label="Ranking quality, nDCG at 10: fine-tuned model 0.419, keyword search 0.214, general model 0.169">
+  <div class="chart reveal" role="img" aria-label="Ranking quality, nDCG at 10: fine-tuned model 0.419, keyword search 0.223, general model 0.168">
     <div class="bar-row best"><span>Fine-tuned model <em>default</em></span><div class="track"><i style="--w: 41.9%"></i></div><b>0.419</b></div>
-    <div class="bar-row"><span>Keyword search (BM25)</span><div class="track"><i style="--w: 21.4%"></i></div><b>0.214</b></div>
-    <div class="bar-row"><span>General model</span><div class="track"><i style="--w: 16.9%"></i></div><b>0.169</b></div>
+    <div class="bar-row"><span>Keyword search (BM25)</span><div class="track"><i style="--w: 22.3%"></i></div><b>0.223</b></div>
+    <div class="bar-row"><span>General model</span><div class="track"><i style="--w: 16.8%"></i></div><b>0.168</b></div>
     <p class="axis">Ranking quality (nDCG@10, 0 to 1, higher is better)</p>
   </div>
   <p class="note reveal">For 13 of the 17 questions worded unlike the contract, a right clause was in the top 10, against 4 for
@@ -161,8 +161,8 @@ qorfinder search "can the employee work for a competitor after leaving?"</code><
     <li><b>English only.</b> Both models were trained on English text.</li>
     <li><b>No scanned documents.</b> A PDF needs a text layer; QorFinder does not read text from images.</li>
     <li><b>Indexing takes a while.</b> About 7 seconds per contract on a 2019 laptop; searching afterwards takes milliseconds.</li>
-    <li><b>Results are leads, not advice.</b> The right clause is not always first, and now and then a heading or a page
-      footer slips in. Always read the clause itself before you rely on it.</li>
+    <li><b>Results are leads, not advice.</b> The right clause is not always first, and now and then a heading on its own
+      slips in. Always read the clause itself before you rely on it.</li>
   </ul>
 </section>
 
