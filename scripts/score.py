@@ -5,7 +5,9 @@ Prints nDCG@10, MRR@10 and R-Precision for BM25, semantic search and the
 RRF hybrid, for wording-matched, paraphrased and all queries (report
 Section 3.4), scored with ranx. Then runs the Wilcoxon signed-rank test
 (SciPy) on the per-query nDCG@10 of each pair of methods, and counts the
-queries with a relevant chunk in the top 10, 30 and 100.
+queries with a relevant chunk in the top 10, 30 and 100. Last, it compares
+the base, fine-tuned and held-out fine-tuned models on the held-out and the
+seen categories, from results/per_query.csv.
 
 Usage: python3 scripts/score.py
 
@@ -37,6 +39,15 @@ PAIRS = [("semantic", "bm25"), ("hybrid", "bm25"), ("hybrid", "semantic")]
 # scores a hit at rank 11 the same as none, so these show the near misses.
 # Added after the main analysis (doc/REMARK.md §3); nDCG@10 stays primary.
 HIT_DEPTHS = [10, 30, 100]
+
+# The held-out fine-tuning run (results/tuning.txt): five categories were
+# left out of training, drawn with random.Random(2026).sample from the 14 on
+# which the 17-category model scored above zero. Compared on the per-query
+# scores of results/per_query.csv.
+HELD_OUT = ["Q03", "Q09", "Q12", "Q15", "Q17"]
+BASE = "sentence-transformers/all-MiniLM-L6-v2"
+FT17 = "all-MiniLM-L6-v2-ft-cuad"
+FT12 = "all-MiniLM-L6-v2-ft-cuad-holdout"
 
 REPO = Path(__file__).resolve().parent.parent
 RUN_DIR = REPO / "results/eval"
@@ -121,6 +132,42 @@ def report(run_dir: Path, testset: Path) -> str:
     return "\n".join(lines)
 
 
+def holdout_report(per_query: Path) -> str:
+    """nDCG@10 on the held-out and the seen categories for the base, the
+    17-category and the 12-category models, with Wilcoxon p between them."""
+    with per_query.open(encoding="utf-8") as f:
+        header, *rows = (line.rstrip("\n").split(",") for line in f)
+    col = {name: i for i, name in enumerate(header)}
+    # model -> metric -> query id -> score
+    by_model: dict[str, dict[str, dict[str, float]]] = {}
+    for r in rows:
+        for m in [f"{me}_ndcg@10" for me in METHODS]:
+            by_model.setdefault(r[col["model"]], {}).setdefault(m, {})[r[col["query"]]] = float(r[col[m]])
+    if FT12 not in by_model:
+        return f"no {FT12} rows in {per_query.name}"
+    ids = sorted(by_model[FT12]["semantic_ndcg@10"])
+    groups = {
+        f"held out ({sum(q[:3] in HELD_OUT for q in ids)})": [q for q in ids if q[:3] in HELD_OUT],
+        f"seen ({sum(q[:3] not in HELD_OUT for q in ids)})": [q for q in ids if q[:3] not in HELD_OUT],
+    }
+    names = {BASE: "base", FT17: "ft17", FT12: "ft12"}
+    lines = ["held-out categories: " + ", ".join(HELD_OUT) + " (m and p)"]
+    for group, qs in groups.items():
+        lines.append(f"{group} queries, mean nDCG@10")
+        lines.append(f"  {'method':<10}" + "".join(f"{n:>9}" for n in names.values()))
+        for me in METHODS:
+            m = f"{me}_ndcg@10"
+            lines.append(
+                f"  {me:<10}"
+                + "".join(f"{mean([by_model[k][m][q] for q in qs]):>9.4f}" for k in names)
+            )
+        lines.append("  Wilcoxon on semantic nDCG@10, two-sided p:")
+        sem = {k: [by_model[k]["semantic_ndcg@10"][q] for q in qs] for k in names}
+        for a, b in [(FT12, BASE), (FT12, FT17)]:
+            lines.append(f"    {names[a]} vs {names[b]}: {wilcoxon_p(sem[a], sem[b])}")
+    return "\n".join(lines)
+
+
 def check_hand_worked() -> None:
     """Score a two-query run worked out by hand and exit if score.py
     disagrees with it."""
@@ -174,6 +221,7 @@ def main() -> int:
     text = report(RUN_DIR, TESTSET)
     print(text)
     (RUN_DIR / "scores.txt").write_text(text + "\n", encoding="utf-8")
+    print(holdout_report(REPO / "results/per_query.csv"))
     return 0
 
 
