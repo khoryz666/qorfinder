@@ -16,7 +16,7 @@ It runs the whole pipeline, one section below per step, in this order:
   2. tune the learning rate on the validation split;
   3. train at the best rate, resuming from the newest checkpoint;
   4. copy the epoch with the lowest validation loss to
-     models/all-MiniLM-L6-v2-ft-cuad/;
+     models/all-MiniLM-L6-v2-ft-cuad/ (or ...-holdout/, see HELD_OUT);
   5. write its reference embeddings for the Rust test.
 
 Usage (the reference shell provides PyTorch and transformers):
@@ -114,7 +114,21 @@ from reference_embeddings import mean_pool_embeddings, sha256
 SEED = 2026
 THREADS = os.cpu_count() or 1
 MAX_SEQ_LEN = 128
-BATCH_SIZE = 16
+# The held-out run (results/tuning.txt) set HELD_OUT = HELD_OUT_RUN: the five
+# categories are left out of training to test unseen clause types. They were
+# drawn with random.Random(2026).sample(..., 5) from the 14 categories on which
+# the 17-category model scored above zero. That run trains on 12 categories,
+# one pair each per batch, writes models/all-MiniLM-L6-v2-ft-cuad-holdout and
+# data/finetune-holdout/, and skips step 5 (the model has no Rust fixture).
+HELD_OUT_RUN = [
+    "Covenant Not To Sue",
+    "No-Solicit Of Employees",
+    "Non-Transferable License",
+    "Uncapped Liability",
+    "Warranty Duration",
+]
+HELD_OUT: list[str] = []
+BATCH_SIZE = 12 if HELD_OUT else 16
 # sentence-transformers' MultipleNegativesRankingLoss scale 20.
 TEMPERATURE = 0.05
 # Share of the held-out contracts kept for validation.
@@ -137,13 +151,14 @@ EPOCHS = 3
 
 REPO = Path(__file__).resolve().parent.parent
 BASE_MODEL = REPO / "models/all-MiniLM-L6-v2"
-FINE_TUNED_MODEL = REPO / "models" / reference_embeddings.FINE_TUNED
+SUFFIX = "-holdout" if HELD_OUT else ""
+FINE_TUNED_MODEL = REPO / "models" / (reference_embeddings.FINE_TUNED + SUFFIX)
 CUAD_JSON = REPO / "data/cuad/CUAD_v1/CUAD_v1.json"
 # The 30 evaluation contracts to exclude (leak rule 1) and the 34 test
 # queries no template may share a 3-word phrase with (leak rule 2).
 TESTSET_DOCS = REPO / "data/testset/docs.txt"
 TESTSET_QUERIES = REPO / "data/testset/queries.jsonl"
-WORK = REPO / "data/finetune"
+WORK = REPO / ("data/finetune" + SUFFIX)
 LOG = WORK / "finetune.log"
 TUNING_TSV = WORK / "hyperparams.tsv"
 SETTINGS_JSON = WORK / "settings.json"
@@ -245,6 +260,8 @@ QUERY_TEMPLATES: dict[str, list[str]] = {
         "period during which the provider warrants its deliverables",
     ],
 }
+assert set(HELD_OUT) <= set(QUERY_TEMPLATES), "HELD_OUT names a category with no templates"
+QUERY_TEMPLATES = {c: t for c, t in QUERY_TEMPLATES.items() if c not in HELD_OUT}
 
 
 def trigrams(text: str) -> set[tuple[str, ...]]:
@@ -789,7 +806,8 @@ def main() -> int:
         print("\ninterrupted; rerun to resume from the latest checkpoint", file=sys.stderr)
         return 130
     install(best)
-    reference_embeddings.write_fine_tuned()
+    if not HELD_OUT:
+        reference_embeddings.write_fine_tuned()
     log("--- finetune.py finished ---")
     return 0
 

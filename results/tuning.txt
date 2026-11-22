@@ -167,18 +167,20 @@ re-seeded before each learning rate there; 74e21cc fixed that. It also took 3 h 
 Fine-tuning with five categories held out: does the gain transfer to unseen clause types?
 measures: the same three steps and validation losses, on 12 of the 17 categories; the scores are in
           per_query.csv (model all-MiniLM-L6-v2-ft-cuad-holdout) and effectiveness.txt
-commit:   74e21cc with this change to scripts/finetune.py (as 58ef1ac, since deleted):
-          BATCH_SIZE = 12 (one pair per category; the batch builder needs BATCH_SIZE <= categories), and the
-          QUERY_TEMPLATES entries of five categories removed: Covenant Not To Sue (Q03), No-Solicit Of
-          Employees (Q09), Non-Transferable License (Q12), Uncapped Liability (Q15), Warranty Duration (Q17).
-          They were drawn with random.Random(2026).sample(..., 5) from the 14 categories on which the
-          17-category model scored above zero (Affiliate License-Licensee, Liquidated Damages and No-Solicit
-          Of Customers scored zero, so they could show nothing).
+commit:   74e21cc with a patch (58ef1ac) that set BATCH_SIZE = 12 and removed the templates of five categories:
+          Covenant Not To Sue (Q03), No-Solicit Of Employees (Q09), Non-Transferable License (Q12), Uncapped
+          Liability (Q15), Warranty Duration (Q17), drawn with random.Random(2026).sample(..., 5) from the 14
+          categories on which the 17-category model scored above zero (Affiliate License-Licensee, Liquidated
+          Damages and No-Solicit Of Customers scored zero, so they could show nothing). The patch is now the
+          constant HELD_OUT in scripts/finetune.py; a rerun with HELD_OUT = HELD_OUT_RUN on 2026-11-22 gave the
+          same losses at every step, the same model (sha256 9eb26c9a...) and per-query scores identical to
+          per_query.csv.
 machine:  Lenovo ThinkPad E14 Gen 3, AMD Ryzen 7 5700U (8 cores, 16 threads), 16 GB RAM, Linux Mint 22.3 (dev machine)
-commands: nix develop .#reference --command python3 scripts/finetune.py
-          qorfinder --model all-MiniLM-L6-v2-ft-cuad --index-dir data/eval-ft eval --reindex
+commands: set HELD_OUT = HELD_OUT_RUN in scripts/finetune.py, then
+          nix develop .#reference --command python3 scripts/finetune.py
+          qorfinder --model all-MiniLM-L6-v2-ft-cuad --model-dir models/all-MiniLM-L6-v2-ft-cuad-holdout \
+            --index-dir data/eval-ft-holdout eval --reindex
           python3 scripts/score.py
-          (in a separate clone: finetune.py writes models/all-MiniLM-L6-v2-ft-cuad, the reported model's folder)
 
 No template shares a 3-word phrase with the 34 test queries. Step 1: 1569 clauses of 12 categories; the
 36 templates pass (mean margin 0.1056, 35/36 positive, recall@10 0.5389, top-1 hit rate 0.639, 7.7x chance).

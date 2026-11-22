@@ -282,6 +282,21 @@ by validation loss, trains (it resumes from the newest checkpoint in
 `models/all-MiniLM-L6-v2-ft-cuad/` and rewrites its reference fixture. The
 whole script took 55 min on the dev machine in the last rerun.
 
+The held-out run (report §4.4.5) leaves five categories out of training to
+test clause types the model has not seen. Set `HELD_OUT = HELD_OUT_RUN` in
+`finetune.py`, run it as above, then score the model with all 34 queries:
+
+```bash
+qorfinder --model all-MiniLM-L6-v2-ft-cuad --model-dir models/all-MiniLM-L6-v2-ft-cuad-holdout \
+  --index-dir data/eval-ft-holdout eval --reindex
+python3 scripts/score.py
+```
+
+It trains on 12 categories into `models/all-MiniLM-L6-v2-ft-cuad-holdout/`
+(38 min) and leaves the reported model and its fixture alone. To get the
+held-out table, add its runs to `results/per_query.csv` under the model name
+`all-MiniLM-L6-v2-ft-cuad-holdout`; `score.py` prints the table last.
+
 The weights are not published, so the model is reproduced only by
 retraining. Training is deterministic on the same machine with the same
 thread count: a rerun on the dev machine (16 threads) gave the reported
