@@ -37,7 +37,7 @@ GROUPS = ["matched", "paraphrased", "all"]
 PAIRS = [("semantic", "bm25"), ("hybrid", "bm25"), ("hybrid", "semantic")]
 # Depths for counting queries with a relevant chunk in the top k: nDCG@10
 # scores a hit at rank 11 the same as none, so these show the near misses.
-# Added after the main analysis (doc/REMARK.md §3); nDCG@10 stays primary.
+# Added after the main analysis; nDCG@10 stays primary.
 HIT_DEPTHS = [10, 30, 100]
 
 # The held-out fine-tuning run (results/tuning.txt): five categories were

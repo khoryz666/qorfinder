@@ -238,6 +238,11 @@ qorfinder --model intfloat/e5-base-v2 --index-dir data/eval-e5 eval
 python3 scripts/score.py
 ```
 
+The model comparison needs all four base models (`python3 scripts/fetch_model.py`
+without `QF_MODELS`). `results/per_query.csv` collects every model's
+`results/eval/per_query.csv`: after scoring a model, append its rows with
+the model's name inserted as the third column, `model`.
+
 The chunk-size and κ sweeps in `tuning.txt` are the same pair of commands in
 a loop over `eval --reindex --max-tokens M --overlap O` and `eval --kappa K`.
 Settings were chosen by leave-one-category-out cross-validation over the
@@ -294,8 +299,8 @@ python3 scripts/score.py
 
 It trains on 12 categories into `models/all-MiniLM-L6-v2-ft-cuad-holdout/`
 (38 min) and leaves the reported model and its fixture alone. To get the
-held-out table, add its runs to `results/per_query.csv` under the model name
-`all-MiniLM-L6-v2-ft-cuad-holdout`; `score.py` prints the table last.
+held-out table, add its rows to `results/per_query.csv` as in §4.2, under
+the model name `all-MiniLM-L6-v2-ft-cuad-holdout`; `score.py` prints the table last.
 
 The weights are not published, so the model is reproduced only by
 retraining. Training is deterministic on the same machine with the same
