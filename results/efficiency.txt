@@ -50,6 +50,20 @@ wrote results/2026-11-02-1637c07-dev/timing.csv
 peak memory 219.3 MB
 
 ==============================================================================
+Full index of all 510 CUAD contracts on the dev machine, one batch at a time (before 1637c07)
+measures: as above; the baseline for embedding 4 batches at a time (2.1 times as fast, 3 times the memory)
+commit:   56ff174
+machine:  Lenovo ThinkPad E14 Gen 3, AMD Ryzen 7 5700U (8 cores, 16 threads), 16 GB RAM, Linux Mint 22.3 (dev machine)
+commands: /usr/bin/time -v qorfinder --index-dir data/full-index index data/cuad/txt
+          qorfinder --index-dir data/full-index eval --timing
+
+indexed 510 document(s), 39307 chunk(s), 0 skipped, in 4005.4 s (prepare 1.1 s, embed 4004.2 s, 9.8 chunks/s)
+peak memory 745.4 MB
+	Elapsed (wall clock) time (h:mm:ss or m:ss): 1:06:45
+34 queries over 39307 chunks, median of 5 runs each
+ total: median 45.3 ms, p95 47.9 ms
+
+==============================================================================
 Per-model latency and memory on the 30-contract eval index
 measures: index size, eval peak memory and wall time, query latency for each model
 commit:   6992466 (base models), 20662e2 (fine-tuned)
