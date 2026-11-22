@@ -87,7 +87,10 @@ jobs:
           if got != lock:
               sys.exit(f"pip freeze differs from requirements.txt: {sorted(set(got.items()) ^ set(lock.items()))}")
           check = subprocess.run([sys.executable, "-m", "pip", "check"], capture_output=True, text=True).stdout
-          extra = [l for l in check.splitlines() if l.strip() and "requires ir-datasets, which is not installed" not in l]
+          # ranx never needs ir-datasets (flake.nix); tqdm needs colorama only on Windows, imports it
+          # optionally, and the Linux-built lock leaves it out.
+          allowed = ("requires ir-datasets, which is not installed", "requires colorama, which is not installed")
+          extra = [l for l in check.splitlines() if l.strip() and not any(a in l for a in allowed)]
           if extra:
               sys.exit("pip check: " + "; ".join(extra))
           print(f"{len(got)} packages, exactly requirements.txt")
@@ -160,7 +163,10 @@ jobs:
           if got != lock:
               sys.exit(f"pip freeze differs from requirements.txt: {sorted(set(got.items()) ^ set(lock.items()))}")
           check = subprocess.run([sys.executable, "-m", "pip", "check"], capture_output=True, text=True).stdout
-          extra = [l for l in check.splitlines() if l.strip() and "requires ir-datasets, which is not installed" not in l]
+          # ranx never needs ir-datasets (flake.nix); tqdm needs colorama only on Windows, imports it
+          # optionally, and the Linux-built lock leaves it out.
+          allowed = ("requires ir-datasets, which is not installed", "requires colorama, which is not installed")
+          extra = [l for l in check.splitlines() if l.strip() and not any(a in l for a in allowed)]
           if extra:
               sys.exit("pip check: " + "; ".join(extra))
           print(f"{len(got)} packages, exactly requirements.txt")
