@@ -530,3 +530,15 @@ The job restores Cargo's target/ folder and the model from the Actions cache (Sw
 actions/cache), so some crates may not have been recompiled; Nix and every tool come fresh from the
 locked flake. Steps from the GitHub API (/actions/runs/44122646263/jobs); the full logs need a signed-in
 account.
+
+==============================================================================
+T3: chunks map back to their source text
+measures: every chunk of the test collection against the source file at its recorded character range
+commit:   7b63069 (page furniture never a chunk of its own)
+machine:  Lenovo ThinkPad E14 Gen 3, AMD Ryzen 7 5700U (8 cores, 16 threads), 16 GB RAM, Linux Mint 22.3 (dev machine)
+commands: cargo test --release -p qf-core --test chunk
+          then, in Python: for each row of the chunks table of data/eval-index/index.sqlite, compare its text
+          with the source file's characters char_start..char_end, whitespace collapsed on both sides
+
+test result: ok. 11 passed; 0 failed; 2 ignored (rejoined_chunks_recover_the_source among the passed)
+1613 chunks, 0 differ with whitespace collapsed (611 differ only in whitespace, which normalisation collapses)
