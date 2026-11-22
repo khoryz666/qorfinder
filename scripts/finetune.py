@@ -29,10 +29,11 @@ data/finetune/. The saved model is the bare BERT transformer (config.json,
 tokenizer.json, model.safetensors): the Rust pipeline already mean-pools and
 unit-normalizes BERT output itself, exactly as it does for the base MiniLM,
 so no sentence-transformers pooling module is written. Training uses every
-CPU thread, and floating-point sums are not deterministic across runs, even
-on the same machine, so a rerun gives slightly different weights and may pick
-a different learning rate; step 5 then rewrites the reference fixture to
-match them.
+CPU thread and is deterministic on the same machine and thread count: a
+rerun on the dev machine reproduced the reported model's sha256
+(results/tuning.txt). Another machine or thread count may sum floats in a
+different order and give slightly different weights; step 5 then rewrites
+the reference fixture to match them.
 
 LEAK PREVENTION (these rules are enforced here, not just documented):
 

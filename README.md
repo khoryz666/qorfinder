@@ -279,14 +279,15 @@ phrase with a test query. It checks the templates, picks the learning rate
 by validation loss, trains (it resumes from the newest checkpoint in
 `data/finetune/`), copies the best epoch to
 `models/all-MiniLM-L6-v2-ft-cuad/` and rewrites its reference fixture. The
-whole script took 3 h 44 min on the dev machine in the last rerun.
+whole script took 55 min on the dev machine in the last rerun.
 
 The weights are not published, so the model is reproduced only by
-retraining, and training is not deterministic even on the same machine: a
-rerun on the dev machine chose a different learning rate and gave different
-weights from the reported ones (SHA-256 `2a164e0e…`), with nDCG@10 within
-0.01 of the record and no significant difference (`results/tuning.txt`). The
-Rust embedder is then checked against the new model's own fixture.
+retraining. Training is deterministic on the same machine with the same
+thread count: a rerun on the dev machine (16 threads) gave the reported
+weights exactly (SHA-256 `2a164e0e…`) and a byte-identical fixture
+(`results/tuning.txt`). Another machine or thread count may sum floats in a
+different order and give slightly different weights; the Rust embedder is
+then checked against the new model's own fixture.
 
 ## License
 
