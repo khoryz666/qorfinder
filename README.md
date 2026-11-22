@@ -75,13 +75,14 @@ crates/qf-core/      the library, one module per pipeline step (section 3.2)
   tests/             integration tests; fixtures/reference/ holds Python reference vectors per model
 crates/qf-cli/       the qorfinder binary: index, search, eval, serve and the local API
 ui/                  React + TypeScript UI, built with Vite to ui/dist; ui/public/favicon.svg is the logo
+pages/               the website for users (index.html, style.css, main.js), deployed by pages.yml
 logo/                the QorFinder logo: gen_logo.py writes its SVGs and the favicon (logo/README.md)
 scripts/             Python, one job per script, settings as constants (table below)
 data/testset/        the frozen test set: sampled contracts, categories, spans, the 34 queries
 data/fixtures/       hand-made files the T1 system test must skip
 results/             the six curated records (table in section 4)
 tools/               Windows setup without Nix, and the scoring installer it shares with CI
-.github/workflows/   ci.yml (Linux and Windows, same checks), release.yml (zips on a tag)
+.github/workflows/   ci.yml (Linux and Windows, same checks), release.yml (zips on a tag), pages.yml (the website)
 flake.nix, rust-toolchain.toml, requirements*.txt, ui/package.json   the pinned environment
 .cargo/              links the C runtime statically into the Windows executable
 about.toml, about.hbs   cargo about: accepted licences and the THIRD_PARTY_LICENSES.html template
