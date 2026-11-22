@@ -1,6 +1,9 @@
 System tests of release v0.0.0 (T1, T5, T7, T8, T11, T12, T13, serve token checks).
 Records kept verbatim. Up to T12 they come from the Windows testing machine, so paths read C:\Users\...;
 the last section is the Linux zip on the development machine and the CI run for T13.
+They ran on the first build of v0.0.0 (13625c1). The tag v0.0.0 was later moved to the code the FYP1
+report describes and its zips rebuilt; the changes since 13625c1 (index rebuilds in the server, the interface
+colours, the fine-tuned model as default with a model choice) were not re-tested on the testing machine.
 
 ==============================================================================
 T1: index a mixed folder, skipping bad files with a reason
