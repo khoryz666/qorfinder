@@ -1,9 +1,8 @@
 /target
 /data/cuad
-/data/eval-index*
-/data/eval-ft
+/data/eval-*
 /data/full-index*
-/data/finetune
+/data/finetune*
 /data/t1-mixed
 /data/t7-change
 /models
