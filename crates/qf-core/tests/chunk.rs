@@ -264,3 +264,34 @@ fn model_tokenizer_is_not_truncated() {
     let text = "word ".repeat(300);
     assert_eq!(model_tokenizer().token_offsets(&text).unwrap().len(), 300);
 }
+
+#[test]
+fn page_furniture_never_stands_alone() {
+    // A footer and page numbers on three pages, between paragraphs of 3 words.
+    let text = "one two three\n\nSource: ACME, 10-Q\n\n1\n\nfour five six\n\nSource: ACME, 10-Q\n\n2\n\nseven eight nine\n\nSource: ACME, 10-Q\n\n3";
+    let got = chunk_strings(text, config(4, 0));
+    // Each paragraph fills a chunk, so the furniture after it is left out
+    // instead of becoming a chunk of its own.
+    assert_eq!(got, ["one two three", "four five six", "seven eight nine"]);
+    // With room, it joins the chunk before it, which stays contiguous.
+    let got = chunk_strings(text, config(9, 0));
+    assert_eq!(
+        got,
+        [
+            "one two three\n\nSource: ACME, 10-Q\n\n1",
+            "four five six\n\nSource: ACME, 10-Q\n\n2",
+            "seven eight nine\n\nSource: ACME, 10-Q\n\n3"
+        ]
+    );
+    // Twice is not enough to be furniture.
+    let twice = "one two three\n\nSource: ACME\n\nfour five six\n\nSource: ACME";
+    assert_eq!(
+        chunk_strings(twice, config(3, 0)),
+        [
+            "one two three",
+            "Source: ACME",
+            "four five six",
+            "Source: ACME"
+        ]
+    );
+}
