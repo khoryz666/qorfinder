@@ -4,7 +4,8 @@
 Prints nDCG@10, MRR@10 and R-Precision for BM25, semantic search and the
 RRF hybrid, for wording-matched, paraphrased and all queries (report
 Section 3.4), scored with ranx. Then runs the Wilcoxon signed-rank test
-(SciPy) on the per-query nDCG@10 of each pair of methods.
+(SciPy) on the per-query nDCG@10 of each pair of methods, and counts the
+queries with a relevant chunk in the top 10, 30 and 100.
 
 Usage: python3 scripts/score.py
 
@@ -32,6 +33,10 @@ METRICS = ["ndcg@10", "mrr@10", "r-precision"]
 GROUPS = ["matched", "paraphrased", "all"]
 # (a, b): is a different from b?
 PAIRS = [("semantic", "bm25"), ("hybrid", "bm25"), ("hybrid", "semantic")]
+# Depths for counting queries with a relevant chunk in the top k: nDCG@10
+# scores a hit at rank 11 the same as none, so these show the near misses.
+# Added after the main analysis (doc/REMARK.md §3); nDCG@10 stays primary.
+HIT_DEPTHS = [10, 30, 100]
 
 REPO = Path(__file__).resolve().parent.parent
 RUN_DIR = REPO / "results/eval"
@@ -46,8 +51,9 @@ def query_types(testset: Path) -> dict[str, str]:
 
 def per_query_scores(qrels: Qrels, run: Run) -> dict[str, dict[str, float]]:
     """metric -> query id -> score. Queries the run has no hits for score 0."""
-    evaluate(qrels, run, METRICS, make_comparable=True)
-    return {m: dict(run.scores[m]) for m in METRICS}
+    hits = [f"hit_rate@{k}" for k in HIT_DEPTHS]
+    evaluate(qrels, run, METRICS + hits, make_comparable=True)
+    return {m: dict(run.scores[m]) for m in METRICS + hits}
 
 
 def mean(values: list[float]) -> float:
@@ -95,6 +101,14 @@ def report(run_dir: Path, testset: Path) -> str:
             pa = [scores[a]["ndcg@10"].get(q, 0.0) for q in ids]
             pb = [scores[b]["ndcg@10"].get(q, 0.0) for q in ids]
             lines.append(f"    {a} vs {b}: {wilcoxon_p(pa, pb)}")
+        lines.append("  queries with a relevant chunk in the top k:")
+        lines.append(f"    {'method':<10}" + "".join(f"{'top ' + str(k):>9}" for k in HIT_DEPTHS))
+        for method in METHODS:
+            counts = "".join(
+                f"{sum(scores[method][f'hit_rate@{k}'].get(q, 0.0) for q in ids):>9.0f}"
+                for k in HIT_DEPTHS
+            )
+            lines.append(f"    {method:<10}{counts}")
         lines.append("")
 
     with (run_dir / "per_query.csv").open("w", encoding="utf-8", newline="\n") as f:
@@ -142,6 +156,9 @@ def check_hand_worked() -> None:
     # The mean over both queries: (0.6934 + 1) / 2.
     if f"{(ndcg + 1) / 2:13.4f}" not in text:
         errors.append("mean nDCG@10 over both queries is not (0.6934 + 1) / 2")
+    # Both queries have a relevant chunk in the top 10, so in the top 30 and 100.
+    if f"    bm25{2:>15}{2:>9}{2:>9}" not in text:
+        errors.append("top-k counts are not 2, 2, 2 for both queries")
     if "semantic vs bm25: n/a (no query differs)" not in text:
         errors.append("identical methods got a Wilcoxon p-value")
     if errors:
