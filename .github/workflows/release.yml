@@ -19,9 +19,13 @@ jobs:
 
       # Built with the runner's rustup (it reads rust-toolchain.toml), not in
       # the Nix shell: a binary linked there loads Nix's own ld-linux and
-      # would not start on a Linux machine without Nix.
+      # would not start on a Linux machine without Nix. Its own cache key for
+      # the same reason: CI's job is also named linux but builds in the Nix
+      # shell, and its cached build scripts need Nix's ld-linux.
       - name: Cache cargo artifacts
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2
+        with:
+          prefix-key: v0-release
 
       - name: Build release binary
         run: cargo build --release
