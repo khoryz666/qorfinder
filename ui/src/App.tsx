@@ -40,7 +40,10 @@ export default function App() {
   return (
     <>
       <header className="bar">
-        <h1>QorFinder</h1>
+        <h1>
+          <img className="logo" src="/favicon.svg" alt="" />
+          QorFinder
+        </h1>
         <nav>
           {(["search", "folder", "about"] as View[]).map((v) => (
             <button
