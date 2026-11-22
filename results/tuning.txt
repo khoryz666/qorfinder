@@ -154,18 +154,43 @@ epoch  val_loss  val_acc@1
 The epoch with the lowest validation loss is kept (the last): model.safetensors sha256
 2a164e0ea9bbcb15e7476881eb403d264451063df834696b8e7869cff2848bf3. Rust matches Python at cosine 1.000000.
 
-Rerun from a fresh clone at 833d4ea, same machine, same command, 16 threads, seed 2026 (2026-11-21):
-the 1e-5 row matched to six decimals, the others did not, so 2e-5 was chosen.
+Rerun at 74e21cc (step 2 seeded once, as in the recorded run), same machine, same command, 16 threads,
+seed 2026 (2026-11-22): every number above is reproduced exactly. Validation losses per rate 1.657440 /
+1.662700 / 1.681580 (1e-5 chosen), per epoch 1.528082 / 1.422807 / 1.413915 (epoch 2 kept), model.safetensors
+sha256 2a164e0e... as above, nDCG@10 over all 34 queries semantic 0.4194, hybrid 0.3502, bm25 0.2141, and the
+regenerated Rust fixture all-MiniLM-L6-v2-ft-cuad.json byte-identical. The whole script took 55 min, training
+about 30 min. Training is deterministic on the same machine and thread count.
+An earlier rerun at 833d4ea (2026-11-21) gave a different model (sha256 fca3ac2b..., 2e-5 chosen) because step 2
+re-seeded before each learning rate there; 74e21cc fixed that. It also took 3 h 44 min, which stays unexplained.
+
+==============================================================================
+Fine-tuning with five categories held out: does the gain transfer to unseen clause types?
+measures: the same three steps and validation losses, on 12 of the 17 categories; the scores are in
+          per_query.csv (model all-MiniLM-L6-v2-ft-cuad-holdout) and effectiveness.txt
+commit:   74e21cc with this change to scripts/finetune.py (as 58ef1ac, since deleted):
+          BATCH_SIZE = 12 (one pair per category; the batch builder needs BATCH_SIZE <= categories), and the
+          QUERY_TEMPLATES entries of five categories removed: Covenant Not To Sue (Q03), No-Solicit Of
+          Employees (Q09), Non-Transferable License (Q12), Uncapped Liability (Q15), Warranty Duration (Q17).
+          They were drawn with random.Random(2026).sample(..., 5) from the 14 categories on which the
+          17-category model scored above zero (Affiliate License-Licensee, Liquidated Damages and No-Solicit
+          Of Customers scored zero, so they could show nothing).
+machine:  Lenovo ThinkPad E14 Gen 3, AMD Ryzen 7 5700U (8 cores, 16 threads), 16 GB RAM, Linux Mint 22.3 (dev machine)
+commands: nix develop .#reference --command python3 scripts/finetune.py
+          qorfinder --model all-MiniLM-L6-v2-ft-cuad --index-dir data/eval-ft eval --reindex
+          python3 scripts/score.py
+          (in a separate clone: finetune.py writes models/all-MiniLM-L6-v2-ft-cuad, the reported model's folder)
+
+No template shares a 3-word phrase with the 34 test queries. Step 1: 1569 clauses of 12 categories; the
+36 templates pass (mean margin 0.1056, 35/36 positive, recall@10 0.5389, top-1 hit rate 0.639, 7.7x chance).
+Learning rate on 1198 train / 372 val pairs:
 lr	val_loss	val_acc@1
-1.000000e-05	1.657440	0.5052
-2.000000e-05	1.635805	0.5223
-5.000000e-05	1.666571	0.5395
+1.000000e-05	1.709577	0.4462
+2.000000e-05	1.847723	0.4731
+5.000000e-05	1.871408	0.5027
+Training at 1e-5: 4335 train / 372 val pairs, batch 12, 3 epochs of 362 steps, 16 threads, CPU.
 epoch  val_loss  val_acc@1
-0      1.492975  0.5515
-1      1.420579  0.5687
-2      1.487521  0.5687
-Epoch 1 kept: model.safetensors sha256 fca3ac2bb6aa882499372767a69eaac143c60bd5cc6a27a7a94ce2bff0bc846f.
-nDCG@10 over all 34 queries, recorded -> rerun: semantic 0.4194 -> 0.4236, hybrid 0.3502 -> 0.3582
-(bm25 0.2141 unchanged); no difference between the two models is significant (paired t-test, p >= 0.05).
-The whole script took 3 h 44 min (training alone 2 h 06 min, against 29.9 min for the recorded run;
-the cause of the slower run was not measured). The reported results use the recorded model.
+0      1.554446  0.4651
+1      1.491208  0.4919
+2      1.568104  0.5296
+Epoch 1 kept: model.safetensors sha256 9eb26c9a7a736dc573fbe1873d5b4c6e50375fc56b255d4948eabf6077195e31.
+Rust matches Python (cargo test --release -p qf-core --test embed -- --ignored: 6/6). 39 min in all.

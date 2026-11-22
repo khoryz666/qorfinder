@@ -273,7 +273,7 @@ Q03p   4    29   47    11   rank 2: chunk 1058, holding 108 of the 134 character
                             the 227 characters of another
 Q06m   2    68   85    86   termination payments; rank 3: chunk 659, an unlabelled   loose labels,
                             fee owed on early termination                             chunk packing
-Q06p   2   108  181   232   as Q06m                                                  as Q06m, wording
+Q06p   2   108  181   232   as Q06m; chunk 659 at rank 9                             as Q06m, wording
 Q08p   2   401   11   110   rank 1: chunk 1628, an unlabelled clause barring          missing label
                             Hydraspin from approaching any Customer
 
@@ -290,3 +290,30 @@ Causes, against the CUAD category descriptions (data/testset/categories.tsv):
 - Loose labels and wording: the Liquidated Damages spans never say "liquidated damages" (for example "This
   Agreement can be terminated at any time prior to the expiry of the Term, as follows:"), and Q01p says
   "companies in the same corporate group" where the contract says "Affiliates".
+
+==============================================================================
+Held-out categories: fine-tuned on 12 categories, scored on the 5 left out (tuning.txt has the run)
+measures: mean nDCG@10 on the held-out (Q03, Q09, Q12, Q15, Q17; 10 queries) and the seen (24) queries for
+          the base model, the 17-category model (ft17, the reported one) and the 12-category model (ft12);
+          Wilcoxon p on semantic nDCG@10 between models
+commit:   37ebe21 (score.py prints this table from per_query.csv)
+commands: python3 scripts/score.py   (last block of its output)
+
+held out (10)   base     ft17     ft12        seen (24)   base     ft17     ft12
+  bm25        0.1220   0.1220   0.1220          bm25    0.2525   0.2525   0.2525
+  semantic    0.2593   0.3783   0.3235          semantic 0.1309  0.4366   0.3816
+  hybrid      0.2411   0.2827   0.2445          hybrid  0.2326   0.3784   0.3402
+Wilcoxon, semantic: held out ft12 vs base p = 0.6875 (6 differing queries), ft12 vs ft17 p = 0.2969 (7);
+                    seen ft12 vs base p = 0.0045 (15), ft12 vs ft17 p = 0.1771 (14).
+ft12 over all 34 queries: semantic 0.3645, hybrid 0.3120, bm25 0.2141; semantic vs bm25 p = 0.0064,
+hybrid vs bm25 p = 0.0018 (score.py on its runs).
+
+Per held-out query, semantic nDCG@10 (base / ft17 / ft12):
+Q03m 0 / 0.113 / 0       Q09m 0.307 / 1 / 1       Q12m 0.130 / 0.139 / 0       Q15m 0.448 / 0.540 / 0.354
+Q03p 0 / 0 / 0           Q09p 0.790 / 1 / 1       Q12p 0 / 0.298 / 0.113       Q15p 0.448 / 0.343 / 0.299
+Q17m 0.469 / 0.202 / 0.469                        Q17p 0 / 0.148 / 0
+
+On unseen categories the fine-tuned model keeps about half its gain over the base model (+0.064 of +0.119),
+not significantly, and most of that is Q09. The gain comes mostly from the categories it was trained on.
+The comparison is not pure: ft12 also trains with batch 12 instead of 16, and its seen queries drop too
+(0.4366 -> 0.3816).
