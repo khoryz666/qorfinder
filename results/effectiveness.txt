@@ -234,3 +234,59 @@ CV semantic_mrr@10  matched 0.4902, paraphrased 0.2584, all 0.3743; chosen: mpne
 Over the five models (the four above and the fine-tuned MiniLM):
 CV semantic_ndcg@10 matched 0.4472, paraphrased 0.3917, all 0.4194; chosen: ft-minilm in 17 of 17 folds
 CV hybrid_ndcg@10   matched 0.4170, paraphrased 0.2835, all 0.3502; chosen: ft-minilm in 17 of 17 folds
+
+==============================================================================
+Near misses and error analysis (added after the main analysis; nDCG@10 stays the primary result)
+measures: queries with at least one relevant chunk in the top 10, 30 and 100 (ranx hit_rate@k, summed),
+          and, for the queries that score 0 with the fine-tuned model, where the relevant chunks rank
+commit:   805065c (score.py prints the counts); queries and relevance rule
+          unchanged since they were frozen
+commands: qorfinder --index-dir data/eval-index eval
+          python3 scripts/score.py
+          qorfinder --model all-MiniLM-L6-v2-ft-cuad --index-dir data/eval-ft eval
+          python3 scripts/score.py
+          The fine-tuned runs regenerated on 22 Nov 2026 are byte-identical to the recorded ones (ce8f847^,
+          results/finetune-minilm/eval/). Ranks below are read from run_*.trec and qrels.trec; chunk
+          offsets and texts from the chunks table of data/eval-index/index.sqlite (same chunks as data/eval-ft).
+
+Queries with a relevant chunk in the top k     top 10  top 30  top 100
+  paraphrased (17)  bm25                            4       7       11
+                    semantic, base                  4      10       13
+                    semantic, fine-tuned           13      14       14
+  all (34)          bm25                           15      20       27
+                    semantic, base                 13      20       26
+                    semantic, fine-tuned           27      30       31
+
+With the base model the paraphrased misses are often close: the first relevant chunk ranks 11 (Q08p),
+13 (Q12p), 18 (Q13p), 25 (Q17p) and 28 (Q10p). Why the base model cannot reach significance: Wilcoxon drops
+tied pairs, and most paraphrased queries score 0 under both methods.
+
+Queries at nDCG@10 = 0 with the fine-tuned model: Q01m, Q01p, Q03p, Q06m, Q06p, Q08p.
+Rank of the first relevant chunk (bm25 / base semantic / fine-tuned semantic; "-" = not in the top 1000):
+
+query  R  bm25  base  ft    what the fine-tuned model ranks first instead            cause
+Q01m   1    41    -    20   rank 3: chunk 500, an unlabelled licence "sublicensable   missing label
+                            to FMI's Affiliates" in the same contract
+Q01p   1   985    -   150   unrelated (a joinder agreement)                          wording, R = 1
+Q03p   4    29   47    11   rank 2: chunk 1058, holding 108 of the 134 characters    relevance rule
+                            of a labelled span; rank 10: chunk 694, holding 209 of
+                            the 227 characters of another
+Q06m   2    68   85    86   termination payments; rank 3: chunk 659, an unlabelled   loose labels,
+                            fee owed on early termination                             chunk packing
+Q06p   2   108  181   232   as Q06m                                                  as Q06m, wording
+Q08p   2   401   11   110   rank 1: chunk 1628, an unlabelled clause barring          missing label
+                            Hydraspin from approaching any Customer
+
+Causes, against the CUAD category descriptions (data/testset/categories.tsv):
+- Missing labels: in Q01m, Q06m/p and Q08p the fine-tuned model ranks first or near the top a clause that
+  fits the category description but is not annotated in CUAD, so it counts as not relevant. With R = 1-2
+  one missing label is enough to score 0.
+- Relevance rule: in Q03p two chunks in the top 10 each hold most of a labelled span, but neither holds a
+  whole span or has half its characters inside one, so neither is relevant. The span at
+  HealthcentralCom 3618-3845 is split between chunks 693 and 694 and has no relevant chunk at all; over the
+  whole test set 2 of 92 spans have none (one Covenant Not To Sue, one Non-Transferable License).
+- Chunk packing: the Liquidated Damages chunks are relevant only by containing a whole short span; the
+  labelled text is 10-20% of chunks of 865 and 1218 characters, so the rest of the chunk sets the ranking.
+- Loose labels and wording: the Liquidated Damages spans never say "liquidated damages" (for example "This
+  Agreement can be terminated at any time prior to the expiry of the Term, as follows:"), and Q01p says
+  "companies in the same corporate group" where the contract says "Affiliates".
