@@ -74,7 +74,8 @@ run from the repository root, since `eval`'s default folders (`data/testset`,
 crates/qf-core/      the library, one module per pipeline step (section 3.2)
   tests/             integration tests; fixtures/reference/ holds Python reference vectors per model
 crates/qf-cli/       the qorfinder binary: index, search, eval, serve and the local API
-ui/                  React + TypeScript UI, built with Vite to ui/dist
+ui/                  React + TypeScript UI, built with Vite to ui/dist; ui/public/favicon.svg is the logo
+logo/                the QorFinder logo: gen_logo.py writes its SVGs and the favicon (logo/README.md)
 scripts/             Python, one job per script, settings as constants (table below)
 data/testset/        the frozen test set: sampled contracts, categories, spans, the 34 queries
 data/fixtures/       hand-made files the T1 system test must skip
