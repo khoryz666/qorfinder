@@ -7,6 +7,7 @@
 //! through DNS rebinding, can therefore neither search the index nor open
 //! files (report 3.6, T8).
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
@@ -19,14 +20,15 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
 use qf_core::chunk::{ChunkConfig, ModelTokenizer};
-use qf_core::embed::Embedder;
+use qf_core::embed::{Embedder, MODELS, Model};
 use qf_core::index::{Progress, Stage, build_index, check_index_dir, index_meta};
 use qf_core::search::Searcher;
+use qf_core::store::Store;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tower_http::services::ServeDir;
 
-use crate::cli::{ModelFiles, load_embedder, load_tokenizer};
+use crate::cli::{ModelFiles, default_model_dir, load_embedder, load_tokenizer};
 
 /// Header the UI sends the token in.
 pub const TOKEN_HEADER: &str = "x-qorfinder-token";
@@ -41,8 +43,13 @@ pub struct App {
     pub token: String,
     pub index_dir: PathBuf,
     pub config: ChunkConfig,
-    pub embedder: &'static Embedder,
-    pub tokenizer: ModelTokenizer,
+    /// The model a new index is built with unless the UI picks another
+    /// (`--model`), and where its files are (`--model-dir`).
+    pub default_model: &'static Model,
+    pub default_model_dir: PathBuf,
+    /// Every model loaded so far. A search uses the model its index was
+    /// built with, so the server may need more than one.
+    pub loaded: Mutex<HashMap<&'static str, &'static Loaded>>,
     /// `None` while there is no usable index.
     pub searcher: Mutex<Option<Searcher<'static>>>,
     /// Counts index openings. Chunk ids are renumbered by every rebuild,
@@ -52,6 +59,12 @@ pub struct App {
     pub problem: Mutex<Option<String>>,
     /// The current or last indexing run.
     pub job: Mutex<Job>,
+}
+
+/// A model ready to embed: its weights and its tokenizer.
+pub struct Loaded {
+    pub embedder: Embedder,
+    pub tokenizer: ModelTokenizer,
 }
 
 /// An indexing run, as the UI shows it.
@@ -101,14 +114,62 @@ impl Progress for JobProgress<'_> {
 }
 
 impl App {
-    /// Open the index in `index_dir`, or say why it cannot be searched.
+    fn model_files(&self, model: &'static Model) -> ModelFiles {
+        let dir = if model == self.default_model {
+            self.default_model_dir.clone()
+        } else {
+            default_model_dir(model)
+        };
+        ModelFiles { model, dir }
+    }
+
+    /// The models whose files are present, the default first.
+    fn available_models(&self) -> Vec<&'static Model> {
+        MODELS
+            .iter()
+            .filter(|&m| self.model_files(m).dir.join("model.safetensors").is_file())
+            .collect()
+    }
+
+    /// `model`, loaded on first use. The server lives as long as the
+    /// process, so a loaded model can too.
+    fn load(&self, model: &'static Model) -> Result<&'static Loaded> {
+        let mut loaded = self.loaded.lock().unwrap();
+        if let Some(&ready) = loaded.get(model.id) {
+            return Ok(ready);
+        }
+        let files = self.model_files(model);
+        let ready: &'static Loaded = Box::leak(Box::new(Loaded {
+            embedder: load_embedder(&files)?,
+            tokenizer: load_tokenizer(&files)?,
+        }));
+        loaded.insert(model.id, ready);
+        Ok(ready)
+    }
+
+    /// The model the index in `index_dir` was built with, if it can be read
+    /// and is a supported one.
+    fn index_model(&self) -> Option<&'static Model> {
+        let meta = Store::open(&self.index_dir).ok()?.read_meta().ok()?;
+        Model::find(&meta.model_id)
+    }
+
+    /// Open the index in `index_dir` with the model it was built with, or
+    /// say why it cannot be searched.
     pub fn open_searcher(&self) {
-        let meta = index_meta(self.embedder, self.config);
         let mut slot = self.searcher.lock().unwrap();
         *slot = None;
-        let opened = Searcher::open(&self.index_dir, self.embedder, &meta);
+        let model = self.index_model().unwrap_or(self.default_model);
+        // A load error says why only in its chain; the others already say it all.
+        let opened = match self.load(model) {
+            Ok(ready) => {
+                let meta = index_meta(&ready.embedder, self.config);
+                Searcher::open(&self.index_dir, &ready.embedder, &meta).map_err(|e| e.to_string())
+            }
+            Err(err) => Err(format!("{err:#}")),
+        };
         self.generation.fetch_add(1, Ordering::SeqCst);
-        *self.problem.lock().unwrap() = opened.as_ref().err().map(|e| e.to_string());
+        *self.problem.lock().unwrap() = opened.as_ref().err().cloned();
         *slot = opened.ok();
     }
 }
@@ -120,14 +181,13 @@ pub fn run(
     model_files: &ModelFiles,
     config: ChunkConfig,
 ) -> Result<()> {
-    // The server lives as long as the process, so the model can too.
-    let embedder: &'static Embedder = Box::leak(Box::new(load_embedder(model_files)?));
     let app = Arc::new(App {
         token: new_token()?,
         index_dir: index_dir.to_path_buf(),
         config,
-        embedder,
-        tokenizer: load_tokenizer(model_files)?,
+        default_model: model_files.model,
+        default_model_dir: model_files.dir.clone(),
+        loaded: Mutex::new(HashMap::new()),
         searcher: Mutex::new(None),
         generation: AtomicU32::new(0),
         problem: Mutex::new(None),
@@ -236,17 +296,26 @@ struct Status {
     chunks: usize,
     source_folder: Option<String>,
     problem: Option<String>,
+    /// The model the open index was built with.
+    model: Option<&'static str>,
+    /// The models a new index can be built with, the default first.
+    models: Vec<&'static str>,
 }
 
 async fn status(State(app): State<Arc<App>>) -> Response {
     let slot = app.searcher.lock().unwrap();
-    let (documents, chunks, source_folder) = match &*slot {
+    let (documents, chunks, source_folder, model) = match &*slot {
         Some(s) => (
             s.store().documents().map(|d| d.len()).unwrap_or(0),
             s.store().chunk_count().unwrap_or(0),
             s.store().source_folder().ok().flatten(),
+            s.store()
+                .read_meta()
+                .ok()
+                .and_then(|m| Model::find(&m.model_id))
+                .map(|m| m.id),
         ),
-        None => (0, 0, None),
+        None => (0, 0, None, None),
     };
     Json(Status {
         index_dir: app.index_dir.display().to_string(),
@@ -255,6 +324,8 @@ async fn status(State(app): State<Arc<App>>) -> Response {
         chunks,
         source_folder: source_folder.map(|f| f.display().to_string()),
         problem: app.problem.lock().unwrap().clone(),
+        model,
+        models: app.available_models().iter().map(|m| m.id).collect(),
     })
     .into_response()
 }
@@ -357,6 +428,9 @@ struct IndexRequest {
     /// The folder to index; missing means rebuild from the folder the
     /// current index was built from (FR8).
     folder: Option<String>,
+    /// The model to build with; missing means the current index's model,
+    /// or the default when there is none.
+    model: Option<String>,
 }
 
 /// Start indexing in the background. The open index stays searchable
@@ -386,6 +460,13 @@ async fn start_index(State(app): State<Arc<App>>, Json(req): Json<IndexRequest>)
     if let Err(err) = check_index_dir(&folder, &app.index_dir) {
         return error(StatusCode::BAD_REQUEST, err.to_string());
     }
+    let model = match req.model.as_deref() {
+        Some(id) => match app.available_models().into_iter().find(|m| m.id == id) {
+            Some(model) => model,
+            None => return error(StatusCode::BAD_REQUEST, format!("no model {id} here")),
+        },
+        None => app.index_model().unwrap_or(app.default_model),
+    };
     {
         let mut job = app.job.lock().unwrap();
         if job.running {
@@ -399,14 +480,18 @@ async fn start_index(State(app): State<Arc<App>>, Json(req): Json<IndexRequest>)
         };
     }
     tokio::task::spawn_blocking(move || {
-        let report = build_index(
-            &folder,
-            &app.index_dir,
-            app.embedder,
-            &app.tokenizer,
-            app.config,
-            &JobProgress(&app),
-        );
+        let report = match app.load(model) {
+            Ok(ready) => build_index(
+                &folder,
+                &app.index_dir,
+                &ready.embedder,
+                &ready.tokenizer,
+                app.config,
+                &JobProgress(&app),
+            )
+            .map_err(|e| e.to_string()),
+            Err(err) => Err(format!("{err:#}")),
+        };
         app.open_searcher();
         let mut job = app.job.lock().unwrap();
         job.running = false;
@@ -433,7 +518,7 @@ async fn start_index(State(app): State<Arc<App>>, Json(req): Json<IndexRequest>)
             }
             Err(err) => {
                 job.failed = true;
-                job.message = Some(err.to_string());
+                job.message = Some(err);
             }
         }
     });

@@ -90,7 +90,8 @@ def save(name: str, reference: dict) -> None:
 def write_base(model_id: str) -> None:
     from sentence_transformers import SentenceTransformer
 
-    revision = MODELS[model_id][0]
+    # The pinned Hugging Face revision: the last part of the model's URL.
+    revision = MODELS[model_id][0].rsplit("/", 1)[1]
     query_prefix, passage_prefix = PREFIXES[model_id]
     model = SentenceTransformer(model_id, revision=revision, device="cpu")
     vectors = model.encode([passage_prefix + s for s in SENTENCES], convert_to_numpy=True)
@@ -138,6 +139,8 @@ def write_fine_tuned() -> None:
 
 def main() -> int:
     for model_id in MODELS:
+        if model_id == FINE_TUNED:
+            continue
         if (MODELS_DIR / model_id.split("/")[-1]).is_dir():
             write_base(model_id)
         else:

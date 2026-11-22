@@ -688,9 +688,9 @@ function Build-Repo {
     Push-Location $script:Repo
     try {
         Invoke-Process -FilePath 'cargo.exe' -Arguments @('build', '--release') -Label 'cargo build --release'
-        # The default model, as CI fetches it; files already there are only checked.
+        # The two models a release ships, as CI fetches them; files already there are only checked.
         if (-not $script:Python) { $script:Python = Find-Python }
-        $env:QF_MODELS = 'minilm'
+        $env:QF_MODELS = 'ft,minilm'
         Invoke-Process -FilePath $script:Python -Arguments @('scripts\fetch_model.py') -Label 'Fetch the model'
     }
     finally {
@@ -743,7 +743,7 @@ function Show-Summary {
     Write-Host 'Next steps:' -ForegroundColor Cyan
     Write-Host '  1. Close this window and open a new PowerShell (PATH is now updated).'
     Write-Host ('  2. cd ' + $script:Repo)
-    Write-Host '  3. $env:QF_MODELS = "minilm"; python scripts\fetch_model.py   (done by -Build)'
+    Write-Host '  3. $env:QF_MODELS = "ft,minilm"; python scripts\fetch_model.py   (done by -Build)'
     Write-Host '  4. cargo test --workspace -- --include-ignored'
     Write-Host '  5. .\target\release\qorfinder.exe serve'
     Write-Host ''
@@ -765,7 +765,7 @@ function Show-Plan {
         Write-Info 'Python .venv with ranx/scipy (only needed to re-score results)'
     }
     if ($Build) {
-        Write-Info 'npm ci + npm run build + cargo build --release + fetch the default model'
+        Write-Info 'npm ci + npm run build + cargo build --release + fetch the two shipped models'
     }
     Write-Info ''
     Write-Info 'Run without -DryRun to install.'

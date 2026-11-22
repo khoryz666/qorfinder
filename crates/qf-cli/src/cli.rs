@@ -250,7 +250,7 @@ const EVAL_INDEX_DIR: &str = "data/eval-index";
 /// The model's folder next to the executable, so a release works from any
 /// working folder; otherwise the repository copy, for `cargo run`. Either
 /// way models/<name>, with <name> from the model id.
-fn default_model_dir(model: &Model) -> PathBuf {
+pub(crate) fn default_model_dir(model: &Model) -> PathBuf {
     let subdir = Path::new("models").join(model.dir_name());
     std::env::current_exe()
         .ok()

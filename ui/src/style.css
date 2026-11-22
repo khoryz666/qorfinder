@@ -127,6 +127,16 @@ input[type="text"] {
   color: var(--text);
 }
 
+select {
+  font: inherit;
+  padding: 6px 10px;
+  margin-left: 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+}
+
 .search,
 .row {
   display: flex;

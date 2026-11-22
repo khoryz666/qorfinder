@@ -3,6 +3,13 @@ import { api, type Job, type SearchResponse, type Status } from "./api";
 
 type View = "search" | "folder" | "about";
 
+// Names for the models QorFinder ships; any other shows its id.
+const MODEL_NAMES: Record<string, string> = {
+  "all-MiniLM-L6-v2-ft-cuad": "Fine-tuned for contracts",
+  "sentence-transformers/all-MiniLM-L6-v2": "General English (all-MiniLM-L6-v2)",
+};
+const modelName = (id: string) => MODEL_NAMES[id] ?? id;
+
 export default function App() {
   const [view, setView] = useState<View>("search");
   const [status, setStatus] = useState<Status | null>(null);
@@ -150,6 +157,7 @@ function SearchView({ status, onSearched }: { status: Status | null; onSearched:
 
 function FolderView({ status, onIndexed }: { status: Status | null; onIndexed: () => void }) {
   const [folder, setFolder] = useState("");
+  const [model, setModel] = useState<string | null>(null);
   const [job, setJob] = useState<Job | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -192,7 +200,7 @@ function FolderView({ status, onIndexed }: { status: Status | null; onIndexed: (
   async function start(target: string | null) {
     setError(null);
     try {
-      await api.index(target);
+      await api.index(target, model ?? status?.model ?? status?.models[0] ?? null);
       setJob(await api.indexStatus());
     } catch (err) {
       setError((err as Error).message);
@@ -213,13 +221,36 @@ function FolderView({ status, onIndexed }: { status: Status | null; onIndexed: (
               , from <code>{status.source_folder}</code>
             </>
           )}
-          .
+          {status.model && <>, understood with the {modelName(status.model).toLowerCase()} model</>}.
         </p>
       ) : (
         <p className="notice">
           No documents are indexed yet. Choose the folder with your PDF, Word (.docx) and text
           files; QorFinder reads every file in it and its subfolders. Nothing leaves this
           computer.
+        </p>
+      )}
+
+      {status && status.models.length > 1 && (
+        <p>
+          <label>
+            Model{" "}
+            <select
+              value={model ?? status.model ?? status.models[0]}
+              onChange={(e) => setModel(e.target.value)}
+              disabled={running}
+            >
+              {status.models.map((id, i) => (
+                <option key={id} value={id}>
+                  {modelName(id)}
+                  {i === 0 ? " (default)" : ""}
+                </option>
+              ))}
+            </select>
+          </label>{" "}
+          <span className="muted">
+            used for the next index; changing it means indexing the folder again
+          </span>
         </p>
       )}
 
@@ -313,8 +344,9 @@ function AboutView({ status }: { status: Status | null }) {
         <li>Reads PDF (with a text layer), Word (.docx) and plain text files.</li>
         <li>
           Splits each document into passages along paragraphs and numbered clauses, and turns
-          each into a vector with a local language model (all-MiniLM-L6-v2 unless another is
-          chosen with --model).
+          each into a vector with a local language model: by default all-MiniLM-L6-v2
+          fine-tuned on public contracts (CUAD), or the general all-MiniLM-L6-v2, chosen under
+          Documents.
         </li>
         <li>Scanned PDFs without a text layer are skipped and listed.</li>
       </ul>

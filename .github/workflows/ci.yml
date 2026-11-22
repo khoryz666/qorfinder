@@ -49,7 +49,7 @@ jobs:
       - name: Fetch the model
         run: nix develop --ignore-environment --keep HOME --keep QF_MODELS --command python3 scripts/fetch_model.py
         env:
-          QF_MODELS: minilm
+          QF_MODELS: ft,minilm
 
       # --include-ignored also runs the tests that load the model, among them
       # the check against sentence-transformers quoted in the report.
@@ -139,7 +139,7 @@ jobs:
       - name: Fetch the model
         run: python scripts/fetch_model.py
         env:
-          QF_MODELS: minilm
+          QF_MODELS: ft,minilm
 
       - name: Test
         run: cargo test --workspace -- --include-ignored

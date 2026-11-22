@@ -44,6 +44,10 @@ export interface Status {
   chunks: number;
   source_folder: string | null;
   problem: string | null;
+  /** The model the open index was built with. */
+  model: string | null;
+  /** The models a new index can be built with, the default first. */
+  models: string[];
 }
 
 export interface Result {
@@ -82,7 +86,8 @@ export const api = {
   status: () => call<Status>("GET", "/status"),
   search: (q: string, k = 10) =>
     call<SearchResponse>("GET", `/search?q=${encodeURIComponent(q)}&k=${k}`),
-  index: (folder: string | null) => call<void>("POST", "/index", { folder }),
+  index: (folder: string | null, model: string | null) =>
+    call<void>("POST", "/index", { folder, model }),
   indexStatus: () => call<Job>("GET", "/index/status"),
   pickFolder: () => call<{ folder: string | null }>("POST", "/folders/pick"),
   open: (chunkId: number, index: number) =>

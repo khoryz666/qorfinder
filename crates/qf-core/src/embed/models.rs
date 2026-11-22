@@ -61,11 +61,16 @@ impl Model {
     }
 }
 
-/// Every supported model. The first is the default, the model QorFinder
-/// is built and evaluated with.
+/// Every supported model. The first is the default: the fine-tuned MiniLM,
+/// which scored best on the test set (results/effectiveness.txt).
 pub const MODELS: &[Model] = &[
+    // MiniLM fine-tuned on the clauses of the CUAD contracts outside the test
+    // sample (scripts/finetune.py), published on the repository's GitHub
+    // release model-ft-cuad, where scripts/fetch_model.py downloads it. Same
+    // architecture, size and pooling as the base, so candle loads it as is.
+    // The weights are the lowest-validation-loss epoch, pinned in the embed test.
     Model {
-        id: "sentence-transformers/all-MiniLM-L6-v2",
+        id: "all-MiniLM-L6-v2-ft-cuad",
         architecture: Architecture::Bert,
         dim: 384,
         max_seq_len: 256,
@@ -73,13 +78,8 @@ pub const MODELS: &[Model] = &[
         query_prefix: "",
         passage_prefix: "",
     },
-    // MiniLM fine-tuned on the clauses of the CUAD contracts outside the test
-    // sample (scripts/finetune.py). It is trained locally, not fetched
-    // from Hugging Face, so scripts/fetch_model.py has no entry for it. Same
-    // architecture, size and pooling as the base, so candle loads it as is.
-    // The weights are the lowest-validation-loss epoch, pinned in the embed test.
     Model {
-        id: "all-MiniLM-L6-v2-ft-cuad",
+        id: "sentence-transformers/all-MiniLM-L6-v2",
         architecture: Architecture::Bert,
         dim: 384,
         max_seq_len: 256,

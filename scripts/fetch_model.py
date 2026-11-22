@@ -3,15 +3,21 @@
 
 QorFinder never touches the network itself (NFR1). Run this script once on
 a connected machine; afterwards indexing and search work offline. Each
-model's files are pinned to one Hugging Face revision and checked against
+model's files are pinned to one revision and checked against
 their SHA-256, so every machine embeds with exactly the same weights. The
-models are those in crates/qf-core/src/embed/models.rs (about 1.4 GB in
+models are those in crates/qf-core/src/embed/models.rs (about 1.5 GB in
 all); files already present are only checked.
+
+The fine-tuned model is not on Hugging Face: scripts/finetune.py trains it,
+and its files are published on this repository's GitHub release
+model-ft-cuad, pinned here the same way. A copy retrained on another machine
+or thread count differs slightly, fails the check and is deleted, so fetch
+it only where it was not retrained.
 
 Usage: python3 scripts/fetch_model.py
 
-Set QF_MODELS to a comma-separated list of short names (minilm, mpnet, bge,
-e5) to fetch only those; CI sets QF_MODELS=minilm.
+Set QF_MODELS to a comma-separated list of short names (ft, minilm, mpnet,
+bge, e5) to fetch only those; CI sets QF_MODELS=ft,minilm.
 """
 
 import hashlib
@@ -23,10 +29,19 @@ import sys
 import urllib.request
 from pathlib import Path
 
-# model id -> (revision, {file name -> sha256 at that revision})
+HF = "https://huggingface.co/{}/resolve/{}"
+# model id -> (URL of its files, {file name -> sha256})
 MODELS = {
+    "all-MiniLM-L6-v2-ft-cuad": (
+        "https://github.com/khoryz666/qorfinder/releases/download/model-ft-cuad",
+        {
+            "config.json": "b6fb0930a64474449442073d24c029d9e09ff41037a3dd5e27f7fe52139faa66",
+            "tokenizer.json": "2fc687b11de0bc1b3d8348f92e3b49ef1089a621506c7661fbf3248fcd54947e",
+            "model.safetensors": "2a164e0ea9bbcb15e7476881eb403d264451063df834696b8e7869cff2848bf3",
+        },
+    ),
     "sentence-transformers/all-MiniLM-L6-v2": (
-        "1110a243fdf4706b3f48f1d95db1a4f5529b4d41",
+        HF.format("sentence-transformers/all-MiniLM-L6-v2", "1110a243fdf4706b3f48f1d95db1a4f5529b4d41"),
         {
             "config.json": "953f9c0d463486b10a6871cc2fd59f223b2c70184f49815e7efbcab5d8908b41",
             "tokenizer.json": "be50c3628f2bf5bb5e3a7f17b1f74611b2561a3a27eeab05e5aa30f411572037",
@@ -34,7 +49,7 @@ MODELS = {
         },
     ),
     "sentence-transformers/all-mpnet-base-v2": (
-        "e8c3b32edf5434bc2275fc9bab85f82640a19130",
+        HF.format("sentence-transformers/all-mpnet-base-v2", "e8c3b32edf5434bc2275fc9bab85f82640a19130"),
         {
             "config.json": "d46a3e04ded82bba22528424480697d394eeda6a27484e08c5bb2bdf5906cfa0",
             "tokenizer.json": "b8be2c30ba5dd723a6d5ee26d013da103d5408d92ddcb23747622f9e48f1d842",
@@ -42,7 +57,7 @@ MODELS = {
         },
     ),
     "BAAI/bge-base-en-v1.5": (
-        "a5beb1e3e68b9ab74eb54cfd186867f64f240e1a",
+        HF.format("BAAI/bge-base-en-v1.5", "a5beb1e3e68b9ab74eb54cfd186867f64f240e1a"),
         {
             "config.json": "bc00af31a4a31b74040d73370aa83b62da34c90b75eb77bfa7db039d90abd591",
             "tokenizer.json": "d241a60d5e8f04cc1b2b3e9ef7a4921b27bf526d9f6050ab90f9267a1f9e5c66",
@@ -50,7 +65,7 @@ MODELS = {
         },
     ),
     "intfloat/e5-base-v2": (
-        "f52bf8ec8c7124536f0efb74aca902b2995e5bcd",
+        HF.format("intfloat/e5-base-v2", "f52bf8ec8c7124536f0efb74aca902b2995e5bcd"),
         {
             "config.json": "01cc39aa39538a8179aa131c8a16adc03b506c92009f091502e4eb0c702f5f78",
             "tokenizer.json": "d241a60d5e8f04cc1b2b3e9ef7a4921b27bf526d9f6050ab90f9267a1f9e5c66",
@@ -60,6 +75,7 @@ MODELS = {
 }
 # QF_MODELS short name -> model id
 SHORT_NAMES = {
+    "ft": "all-MiniLM-L6-v2-ft-cuad",
     "minilm": "sentence-transformers/all-MiniLM-L6-v2",
     "mpnet": "sentence-transformers/all-mpnet-base-v2",
     "bge": "BAAI/bge-base-en-v1.5",
@@ -114,8 +130,8 @@ class Handler(urllib.request.HTTPSHandler):
         return self.do_open(Connection, req, context=self._context)
 
 
-def fetch(repo: str, revision: str, name: str, dest: Path) -> None:
-    url = f"https://huggingface.co/{repo}/resolve/{revision}/{name}"
+def fetch(base_url: str, name: str, dest: Path) -> None:
+    url = f"{base_url}/{name}"
     tmp = dest.with_suffix(dest.suffix + ".part")
     print(f"downloading {url}", flush=True)
     opener = urllib.request.build_opener(Handler)
@@ -127,14 +143,14 @@ def fetch(repo: str, revision: str, name: str, dest: Path) -> None:
 
 def fetch_model(model_id: str) -> bool:
     """Fetch the files of one model that are missing and check them all."""
-    revision, files = MODELS[model_id]
+    base_url, files = MODELS[model_id]
     # models/<name>, as qorfinder looks for it.
     model_dir = MODELS_DIR / model_id.split("/")[-1]
     model_dir.mkdir(parents=True, exist_ok=True)
     for name, expected in files.items():
         dest = model_dir / name
         if not dest.exists():
-            fetch(model_id, revision, name, dest)
+            fetch(base_url, name, dest)
         actual = sha256(dest)
         if actual != expected:
             # Deleted, or every rerun would only re-check the bad file.

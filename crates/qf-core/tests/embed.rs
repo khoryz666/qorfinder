@@ -3,9 +3,13 @@ use std::path::PathBuf;
 use qf_core::embed::{DEFAULT_MODEL, EmbedError, Embedder, MODELS, Model, Pooling};
 
 fn model_dir() -> PathBuf {
+    dir_of(DEFAULT_MODEL)
+}
+
+fn dir_of(model: &Model) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../models")
-        .join(DEFAULT_MODEL.dir_name())
+        .join(model.dir_name())
 }
 
 fn load() -> Embedder {
@@ -23,7 +27,7 @@ fn models_are_found_by_id() {
         Pooling::Cls
     );
     assert!(Model::find("all-MiniLM-L6-v2").is_none());
-    assert_eq!(DEFAULT_MODEL.id, "sentence-transformers/all-MiniLM-L6-v2");
+    assert_eq!(DEFAULT_MODEL.id, "all-MiniLM-L6-v2-ft-cuad");
     // Ids, and so model folders, are unique.
     for (i, a) in MODELS.iter().enumerate() {
         for b in &MODELS[i + 1..] {
@@ -44,7 +48,8 @@ fn files_of_another_model_are_refused() {
 #[test]
 #[ignore = "needs models/ from scripts/fetch_model.py"]
 fn loads_minilm() {
-    let embedder = load();
+    let model = Model::find("sentence-transformers/all-MiniLM-L6-v2").unwrap();
+    let embedder = Embedder::load(model, &dir_of(model)).unwrap();
     assert_eq!(embedder.dim(), 384);
     // The weights pinned in scripts/fetch_model.py.
     assert_eq!(
@@ -54,21 +59,14 @@ fn loads_minilm() {
 }
 
 #[test]
-#[ignore = "needs the fine-tuned model from scripts/finetune.py"]
+#[ignore = "needs models/ from scripts/fetch_model.py"]
 fn loads_finetuned_minilm() {
     let model = Model::find("all-MiniLM-L6-v2-ft-cuad").unwrap();
-    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../models")
-        .join(model.dir_name());
-    if !dir.is_dir() {
-        println!("skipped {}: not fetched", model.id);
-        return;
-    }
-    let embedder = Embedder::load(model, &dir).unwrap();
+    let embedder = Embedder::load(model, &dir_of(model)).unwrap();
     assert_eq!(embedder.dim(), 384);
-    // The weights are not published, so they are pinned by the SHA-256 the
-    // reference fixture records: as committed, the reported run's
-    // (2a164e0e...); finetune.py rewrites both when it retrains.
+    // Pinned by the SHA-256 the reference fixture records: as committed, the
+    // published weights' (2a164e0e..., as in scripts/fetch_model.py);
+    // finetune.py rewrites the fixture when it retrains.
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("tests/fixtures/reference")
         .join(format!("{}.json", model.dir_name()));
@@ -153,10 +151,9 @@ fn embeddings_match_sentence_transformers() {
         };
         assert_eq!(reference["pooling"], pooling, "{}", model.id);
 
-        let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../models")
-            .join(model.dir_name());
-        if model != DEFAULT_MODEL && !dir.is_dir() {
+        let dir = dir_of(model);
+        // The two MiniLMs are fetched in CI; the larger models may not be.
+        if !model.id.contains("MiniLM") && !dir.is_dir() {
             println!("skipped {}: not fetched", model.id);
             continue;
         }

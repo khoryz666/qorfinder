@@ -49,8 +49,8 @@ nix build .#requirements && cp result/requirements*.txt . && chmod u+w requireme
 Then fetch the model and build:
 
 ```bash
-QF_MODELS=minilm python3 scripts/fetch_model.py   # the default model, about 90 MB
-python3 scripts/fetch_model.py                    # or all four (about 1.4 GB), for the model comparison
+QF_MODELS=ft,minilm python3 scripts/fetch_model.py   # the two shipped models, about 180 MB
+python3 scripts/fetch_model.py                       # or all five (about 1.5 GB), for the model comparison
 (cd ui && npm ci && npm run build)
 cargo build --release
 ```
@@ -166,24 +166,30 @@ model and chunk settings it was built with.
 
 Each model is one entry in `crates/qf-core/src/embed/models.rs`
 (architecture, size, input length, pooling, prefixes), one pin in
-`scripts/fetch_model.py` (revision and SHA-256 of each file) and one
+`scripts/fetch_model.py` (download address and SHA-256 of each file) and one
 reference fixture. To add one, add the first two, fetch it and run
 `reference_embeddings.py` for the third.
 
 | `--model` | Architecture | Size | Pooling | Query / passage prefix |
 |---|---|---|---|---|
-| `sentence-transformers/all-MiniLM-L6-v2` (default) | BERT, 6 layers | 384 | mean | none |
+| `all-MiniLM-L6-v2-ft-cuad` (default) | BERT, 6 layers | 384 | mean | none (trained by `finetune.py`, section 4.5) |
+| `sentence-transformers/all-MiniLM-L6-v2` | BERT, 6 layers | 384 | mean | none |
 | `sentence-transformers/all-mpnet-base-v2` | MPNet, 12 layers | 768 | mean | none |
 | `BAAI/bge-base-en-v1.5` | BERT, 12 layers | 768 | first token | `Represent this sentence for searching relevant passages: ` / none |
 | `intfloat/e5-base-v2` | BERT, 12 layers | 768 | mean | `query: ` / `passage: ` |
-| `all-MiniLM-L6-v2-ft-cuad` | BERT, 6 layers | 384 | mean | none (trained by `finetune.py`, section 4.5) |
+
+The four base models come from Hugging Face; the fine-tuned one from this
+repository's GitHub release `model-ft-cuad`. `qorfinder serve` builds a new
+index with the model chosen on its Documents page (the default first) and
+searches an index with the model it was built with.
 
 ### 3.5 Releases
 
 Pushing a tag `v*` runs `release.yml`: one zip per OS
 (`qorfinder-<tag>-linux-x86_64.zip`, `qorfinder-<tag>-windows-x86_64.zip`)
-with the executable, `models/all-MiniLM-L6-v2/`, the built UI in `ui/`, the
-licences and `THIRD_PARTY_LICENSES.html`. The executable finds the model and
+with the executable, `models/all-MiniLM-L6-v2-ft-cuad/` and
+`models/all-MiniLM-L6-v2/`, the built UI in `ui/`, the licences and
+`THIRD_PARTY_LICENSES.html`. The executable finds the models and
 UI next to itself, so the unpacked folder runs as it is. The Linux binary is
 built outside Nix so that it runs on Ubuntu 24.04 and Linux Mint 22 without
 Nix.
@@ -224,8 +230,8 @@ run.
 ### 4.2 Retrieval effectiveness
 
 ```bash
-qorfinder eval              # indexes data/cuad/sample into data/eval-index, writes results/eval/
-python3 scripts/score.py    # writes scores.txt and per_query.csv beside the runs
+qorfinder --model sentence-transformers/all-MiniLM-L6-v2 eval   # indexes data/cuad/sample into data/eval-index, writes results/eval/
+python3 scripts/score.py                                        # writes scores.txt and per_query.csv beside the runs
 ```
 
 `results/eval/scores.txt` should match the all-MiniLM-L6-v2 section of
@@ -238,7 +244,7 @@ qorfinder --model intfloat/e5-base-v2 --index-dir data/eval-e5 eval
 python3 scripts/score.py
 ```
 
-The model comparison needs all four base models (`python3 scripts/fetch_model.py`
+The model comparison needs every model (`python3 scripts/fetch_model.py`
 without `QF_MODELS`). `results/per_query.csv` collects every model's
 `results/eval/per_query.csv`: after scoring a model, append its rows with
 the model's name inserted as the third column, `model`.
@@ -273,10 +279,17 @@ describes.
 
 ### 4.5 Fine-tuning
 
+The fine-tuned model is fetched like the others; to score it:
+
 ```bash
-nix develop .#reference --command python3 scripts/finetune.py
 qorfinder --model all-MiniLM-L6-v2-ft-cuad --index-dir data/eval-ft eval --reindex
 python3 scripts/score.py
+```
+
+To retrain it instead of fetching it:
+
+```bash
+nix develop .#reference --command python3 scripts/finetune.py
 ```
 
 `finetune.py` trains on the clauses of the 480 CUAD contracts outside the
@@ -302,14 +315,16 @@ It trains on 12 categories into `models/all-MiniLM-L6-v2-ft-cuad-holdout/`
 held-out table, add its rows to `results/per_query.csv` as in §4.2, under
 the model name `all-MiniLM-L6-v2-ft-cuad-holdout`; `score.py` prints the table last.
 
-The weights are not published, so the model is reproduced only by
-retraining. Training is deterministic on the same machine with the same
-thread count: a rerun on the dev machine (16 threads) gave the reported
-weights exactly (SHA-256 `2a164e0e…`) and a byte-identical fixture
-(`results/tuning.txt`). Another machine or thread count may sum floats in a
-different order and give slightly different weights; the Rust embedder is
-then checked against the new model's own fixture.
+The published weights are the reported ones (SHA-256 `2a164e0e…`).
+Training is deterministic on the same machine with the same thread count: a
+rerun on the dev machine (16 threads) gave them exactly and a byte-identical
+fixture (`results/tuning.txt`). Another machine or thread count may sum
+floats in a different order and give slightly different weights; the Rust
+embedder is then checked against the new model's own fixture, and
+`fetch_model.py` would replace the retrained files with the published ones,
+so do not run it with `ft` afterwards.
 
 ## License
 
-MIT. The bundled model is Apache-2.0; see `licenses/all-MiniLM-L6-v2.txt`.
+MIT. The bundled models are Apache-2.0; see `licenses/`. The fine-tuned
+model was trained on CUAD (CC BY 4.0, The Atticus Project).
