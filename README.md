@@ -208,7 +208,7 @@ them in.
 | `tuning.txt` | the chunk-size and κ sweeps; how the fine-tune was set up | §3.7, §4.4 |
 | `efficiency.txt` | 510-contract indexing and latency on both machines; per-model latency | Table 4.3 |
 | `timing.csv` | every query's encode, scan and total time per run | Table 4.3 |
-| `system-tests.txt` | the first build of release v0.0.0 (13625c1) on the testing machine: T1, T2, T5, T7, T8, T11, T12 | Table 4.4 |
+| `system-tests.txt` | release v0.0.0 on the testing machine (T1, T2, T5, T7, T8, T11, T12), its first build's Linux zip, T13, T3 | Table 4.4 |
 
 ### 4.1 The test collection
 
