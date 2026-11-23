@@ -4,9 +4,8 @@ Windows-1252, so "·" and "…" are restored here, and long temporary index fold
 Up to the Windows T11 they come from the Windows testing machine, so paths read C:\Users\...; they were run
 on 22 and 23 Nov 2026 by one script with the zip of the final v0.0.0 (4fa29e5), the code the FYP1 report
 describes, downloaded from the GitHub release (sha256 fb3a1772a3d82d441e5354653e8a0ea3c890acd5f3df86fe072dd7dea9be4c5f).
-The Linux section after them ran on the first build of v0.0.0 (13625c1), before the index-rebuild fixes, the
-interface colours and the fine-tuned default model, which were not re-tested with the Linux zip.
-The last sections are the CI run for T13 and the T3 check.
+The Linux section after them is the Linux zip of the same release on the development machine (23 Nov), and
+the last sections are the CI run for T13 and the T3 check.
 
 ==============================================================================
 T1: index a mixed folder, skipping bad files with a reason
@@ -431,13 +430,15 @@ VCRUNTIME or api-ms-win-crt named: False
 T11, T1, T5 and T8: the Linux zip on Linux Mint
 measures: the zip runs as unpacked, outside Nix, and loads only system libraries; T1 and T5 pass;
           indexing and search work with no network adapter; the process only uses 127.0.0.1
-commit:   release zip qorfinder-v0.0.0-linux-x86_64.zip (tag v0.0.0 = 13625c1), downloaded from the
-          GitHub release on 21 Nov 2026, sha256 31f646f0c416e09e4d9676c882f4eafd1f04e5145603874286b1889fb9343bdd
+commit:   release zip qorfinder-v0.0.0-linux-x86_64.zip (tag v0.0.0 = 4fa29e5), downloaded from the
+          GitHub release on 23 Nov 2026, sha256 3dcadc56b6b72bd2f69be596fff0296bff6ca2b243f2b911b1315ee306ddd690
 machine:  Lenovo ThinkPad E14 Gen 3 (development machine), Linux Mint 22.3, glibc 2.39-0ubuntu8.12
 commands: every run below used `env -i PATH=/usr/bin:/bin HOME=$HOME`, so nothing from the Nix shell was on
           the PATH; `unshare -rn` runs a command in a new network namespace, whose only interface is the
           loopback (down unless set up), so no network adapter exists for it; `strace -f -e trace=%network`
-          records every network system call of the process and its threads
+          records every network system call of the process and its threads (with -f it also writes one
+          "+++ exited +++" line per thread, which is not a system call)
+folder:   data/t1-mixed as rebuilt by scripts/prepare_system_tests.py (the T1 folder above)
 
 == 1. libraries (T11)
 $ readelf -d qorfinder | grep NEEDED
@@ -450,74 +451,97 @@ $ readelf -l qorfinder | grep interpreter
 $ readelf -V qorfinder | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -1
 GLIBC_2.39
 $ /usr/bin/ldd qorfinder
+	linux-vdso.so.1
 	libgcc_s.so.1 => /lib/x86_64-linux-gnu/libgcc_s.so.1
 	libm.so.6 => /lib/x86_64-linux-gnu/libm.so.6
 	libc.so.6 => /lib/x86_64-linux-gnu/libc.so.6
 	/lib64/ld-linux-x86-64.so.2
+RPATH/RUNPATH entries: 0
+$ qorfinder --version
+qorfinder 0.1.0
 no RPATH or RUNPATH; every library resolves to the system's /lib/x86_64-linux-gnu.
 
 == 2. index with no network adapter (T1, T8)
 $ unshare -rn sh -c 'ip -brief link; strace -f -e trace=%network -o index.strace qorfinder --index-dir <tmp> index data/t1-mixed'
-lo               DOWN           00:00:00:00:00:00 <LOOPBACK>
+lo               DOWN           00:00:00:00:00:00 <LOOPBACK> 
 skipped .../data/t1-mixed/fees.xlsx: unsupported file type
 skipped .../data/t1-mixed/corrupt.pdf: cannot parse file: failed parsing cross reference table: invalid start value
 skipped .../data/t1-mixed/encrypted.pdf: encrypted
 skipped .../data/t1-mixed/over-50mb.txt: file is 54449696 bytes, over the 52428800 byte limit
 skipped .../data/t1-mixed/scanned.pdf: no text layer
-indexed 29 document(s), 2011 chunk(s), 5 skipped, in 89.0 s (prepare 0.3 s, embed 88.6 s, 22.7 chunks/s)
-peak memory 1357.1 MB
-index.strace: 0 lines (no network system call at all)
-The folder is the rebuilt one described in T1 (9 DOCX), hence 29 documents and 2011 chunks, not 30 and 2029.
+indexed 29 document(s), 1959 chunk(s), 5 skipped, in 91.3 s (prepare 0.6 s, embed 90.6 s, 21.6 chunks/s)
+peak memory 1474.4 MB
+index.strace: 21 lines, all "+++ exited with 0 +++" of the threads; no network system call at all
 
 == 3. search with no network adapter (T5, T8)
-$ unshare -rn sh -c 'strace -f -e trace=%network -o search.strace qorfinder --index-dir <tmp> search "which state'"'"'s law governs this agreement"'
- 1. 0.651  ADIANUTRITION,INC_04_01_2005-EX-10.D2-RESELLER AGREEMENT.docx
+$ unshare -rn sh -c 'strace -f -e trace=%network -o search.strace qorfinder --index-dir <tmp> search "which state'"'"'s law governs this agreement" -k 2'
+ 1. 0.503  ADAPTIMMUNETHERAPEUTICSPLC_04_06_2017-EX-10.11-STRATEGIC ALLIANCE AGREEMENT.docx
+           .../data/t1-mixed · characters 77532–78630
+           facsimile or .pdf signed copies will constitute evidence of this
+           Agreement. 15.10 Export Control. Notwithstanding any other provision of
+           this Agreement, it is understood that the Parties are subject to, and
+           shall comply with, applicable United States laws, regulations, and…
+
+ 2. 0.485  ADIANUTRITION,INC_04_01_2005-EX-10.D2-RESELLER AGREEMENT.docx
            .../data/t1-mixed · characters 24893–25692
            6.7 GOVERNING LAW. This Agreement shall be governed by and construed
-           under the laws of the State of California, ...
- 2. 0.598  CybergyHoldingsInc_20140520_10-Q_EX-10.27_8605784_EX-10.27_Affiliate Agreement.pdf
-           .../data/t1-mixed · characters 28684–29246 · page 13
-search.strace: 0 lines
+           under the laws of the State of California, excluding conflict of laws
+           provisions and excluding the 1980 United Nations Convention on Contracts
+           for the International Sale of Goods. The parties consent to the…
+
+2 result(s) in 388.0 ms (encode 386.9 ms, scan 1.1 ms) · peak memory 188.1 MB
+search.strace: 17 lines, all thread exits; no network system call
+(The query is without the "?" of the Windows runs, so its ranking differs slightly. The search ran under
+strace -f.)
 
 The same through the UI's API, in a namespace whose only interface is the loopback, set up:
 $ unshare -rn sh -c 'ip link set lo up; qorfinder --index-dir <tmp> serve & ...; curl .../api/search?q=...; curl https://github.com'
 lo               UNKNOWN        00:00:00:00:00:00 <LOOPBACK,UP,LOWER_UP>
-/api/search -> rank 1 ADIANUTRITION ... RESELLER AGREEMENT.docx, characters 24893-25692, score 0.651
-curl https://github.com -> Could not resolve host: github.com
+/api/search -> rank 1 ADAPTIMMUNETHERAPEUTICSPLC_04_06_2017-EX-10.11-STRATEGIC ALLIANCE AGREEMENT.docx, characters 77532-78630, score 0.503
+curl https://github.com -> curl: (6) Could not resolve host: github.com
 
 == 4. serve: tokens, Host header and Open file (T5, T8)
-$ qorfinder --index-dir <tmp> serve
-QorFinder is running at http://127.0.0.1:43955/?token=<32 hex digits>
+$ BROWSER=true qorfinder --index-dir <tmp> serve      (then the calls below with Python's urllib)
+QorFinder is running at http://127.0.0.1:44361/?token=<32 hex digits>
 GET /?token=...                                       -> 200
 GET /api/status        without token header           -> 403
 GET /api/status        with token, Host: evil.example -> 403
-GET /api/status        with token, Host: localhost:43955 -> 403
-GET /api/status        with token                     -> ready, 29 documents, 2011 chunks
+GET /api/status        with token, Host: localhost:44361 -> 403
+GET /api/status        with token                     -> 200, ready True, 29 documents, 1959 chunks, model all-MiniLM-L6-v2-ft-cuad
 GET /api/search?q=can the affiliate keep earning commission after the agreement ends?&k=2
-    -> rank 1 UsioInc_20040428_SB-2_EX-10.11_1723988_EX-10.11_Affiliate Agreement 2.pdf, page 4, chunk 2002,
-       "Section 5.02 [TERMINATION]A, Network 1 shall continue to pay to the Affiliate ..."
+    -> rank 1 SouthernStarEnergyInc_20051202_SB-2A_EX-9_801890_EX-9_Affiliate Agreement.pdf, page 7, chunk 1780, characters 20374-21052,
+       "(2) Upon termination of the relationship under this agreement, the Affiliate is ..."
 GET /api/search?q=which state's law governs this agreement&k=2
-    -> rank 1 ADIANUTRITION,INC_04_01_2005-EX-10.D2-RESELLER AGREEMENT.docx, chunk 444
-POST /api/open {"chunk_id":2002} -> 204; the PDF opened in Xreader, the default PDF viewer
-POST /api/open {"chunk_id":444}  -> 204; the DOCX opened in LibreOffice Writer
-$ pdftotext -f 4 -l 4 "UsioInc_..._Affiliate Agreement 2.pdf" - | grep -c 5.02
-3
-(The open requests are the calls the UI's Open file button makes.)
+    -> rank 1 ADAPTIMMUNETHERAPEUTICSPLC_04_06_2017-EX-10.11-STRATEGIC ALLIANCE AGREEMENT.docx, chunk 362, characters 77532-78630,
+       "facsimile or .pdf signed copies will constitute evidence of this Agreement. 15.10 ..."
+POST /api/open {"chunk_id":1780,"index":1} -> 204
+POST /api/open {"chunk_id":362,"index":1} -> 204
+After the two open calls, /usr/bin/xreader (the default PDF viewer) was running with the PDF and LibreOffice
+Writer (soffice.bin --writer) with the DOCX.
+$ pdftotext -f 7 -l 7 "SouthernStarEnergyInc_..._Affiliate Agreement.pdf" - | grep -c 'Upon termination of the relationship'
+1
+(The open requests are the calls the UI's Open file button makes; "index" is the index generation that
+/api/search returned, which /api/open checks.)
 
 == 5. network traffic of a normal session (T8)
 $ BROWSER=true strace -f -e trace=%network -o serve.strace qorfinder --index-dir <tmp> serve
-then, through the API: the page, status, a search, a rebuild of the index (POST /api/index, 29 documents,
-2011 chunks, 89 s), status, another search, then Ctrl+C.
+then, through the API: the page, status, a search, a rebuild of the index (POST /api/index -> 202,
+"Indexed 29 document(s) into 1959 passage(s) in 96 s.", polling /api/index/status every 2 s), status,
+another search, then SIGINT.
 BROWSER=true keeps the browser out of the trace; Open file is left out for the same reason, because the
 viewer it starts is traced with -f as a child (section 4 shows it working).
-serve.strace: 317 lines from 3 processes (the server, its threads, and the `true` started as the browser)
+serve.strace: 327 lines from the server and its threads
   1 socket(AF_INET, SOCK_STREAM|SOCK_CLOEXEC|SOCK_NONBLOCK, IPPROTO_IP) = 10
+  1 setsockopt(10, SOL_SOCKET, SO_REUSEADDR, [1], 4) = 0
   1 bind(10, {sa_family=AF_INET, sin_port=htons(0), sin_addr=inet_addr("127.0.0.1")}, 16) = 0
   1 listen(10, 128) = 0
- 51 accept4(10, {sa_family=AF_INET, sin_port=htons(<port>), sin_addr=inet_addr("127.0.0.1")}, ...)
+  1 getsockname(10, ... sin_addr=inet_addr("127.0.0.1") ...) = 0
+ 54 accept4(10, {sa_family=AF_INET, sin_port=htons(<port>), sin_addr=inet_addr("127.0.0.1")}, ...)
+    (and 54 accept4 that returned EAGAIN, nothing waiting)
   0 connect
-every other line is a read, write or shutdown on those sockets or on a local socketpair; no AF_INET6, no
-address other than 127.0.0.1.
+  1 socketpair(AF_UNIX, ...), the runtime's wake-up pipe, and 1 sendto of one byte on it
+every other line is a recvfrom or shutdown on the accepted sockets; no AF_INET6, no address other than
+127.0.0.1.
 
 ==============================================================================
 T13: build and test on a fresh machine with Nix
