@@ -5,7 +5,7 @@ Up to the Windows T11 they come from the Windows testing machine, so paths read 
 on 22 and 23 Nov 2026 by one script with the zip of the final v0.0.0 (4fa29e5), the code the FYP1 report
 describes, downloaded from the GitHub release (sha256 fb3a1772a3d82d441e5354653e8a0ea3c890acd5f3df86fe072dd7dea9be4c5f).
 The Linux section after them is the Linux zip of the same release on the development machine (23 Nov), and
-the last sections are the CI run for T13 and the T3 check.
+the last sections are the CI run for T13 on the same code and the T3 check.
 
 ==============================================================================
 T1: index a mixed folder, skipping bad files with a reason
@@ -546,22 +546,29 @@ every other line is a recvfrom or shutdown on the accepted sockets; no AF_INET6,
 ==============================================================================
 T13: build and test on a fresh machine with Nix
 measures: the shell is made from the locked flake alone, and the project builds and its tests pass
-commit:   540a865, the parent of the v0.0.0 tag 13625c1, which adds only results/2026-11-17-540a865-t590/
+commit:   9f2de1d, the parent of the v0.0.0 tag 4fa29e5, which changes only .github/workflows/release.yml,
+          so the code and the flake are those of v0.0.0
 machine:  fresh GitHub Actions runner, ubuntu-latest, Nix installed by cachix/install-nix-action v27
-run:      https://github.com/khoryz666/qorfinder/actions/runs/44122646263, job "linux" (134177877802),
-          17 Nov 2026 16:10:13-16:12:35 UTC, conclusion success
+run:      https://github.com/khoryz666/qorfinder/actions/runs/45045309181, job "linux" (137278519763),
+          22 Nov 2026 16:42:17-17:03:55 UTC, conclusion success at the first attempt
 commands: each step runs `nix develop --ignore-environment --keep HOME --command ...`, so only tools from the
           flake are on the PATH:
           cargo fmt --all -- --check                              success
           cargo clippy --workspace --all-targets -- -D warnings   success
-          python3 scripts/fetch_model.py (QF_MODELS=minilm)       success
-          cargo test --workspace -- --include-ignored             success (builds the workspace first)
-          python3 scripts/test_score.py                           success
+          cargo build --release                                   success
+          python3 scripts/fetch_model.py                          success
+          cargo test --workspace -- --include-ignored             success
+          python3 scripts/score.py                                success
           cd ui && npm ci && npm run build                        success
+          (the same job also checks that requirements*.txt match the flake and install with pip: success)
 The job restores Cargo's target/ folder and the model from the Actions cache (Swatinem/rust-cache,
 actions/cache), so some crates may not have been recompiled; Nix and every tool come fresh from the
-locked flake. Steps from the GitHub API (/actions/runs/44122646263/jobs); the full logs need a signed-in
+locked flake. Steps from the GitHub API (/actions/runs/45045309181/jobs); the full logs need a signed-in
 account.
+The next push, 2ddd234 (results and website text only), failed its first attempt while Nix built the shell:
+one of the rich package's own tests (test_brokenpipeerror) failed in the build sandbox, before any project
+step ran. The rerun of the same commit passed (run 45090950209, attempt 2, job 137422953989,
+23 Nov 2026 00:58:16-01:20:02 UTC).
 
 ==============================================================================
 T3: chunks map back to their source text
