@@ -1,195 +1,190 @@
 System tests of release v0.0.0 (T1, T5, T7, T8, T11, T12, T13, serve token checks).
-Records kept verbatim. Up to T12 they come from the Windows testing machine, so paths read C:\Users\...;
-the last section is the Linux zip on the development machine and the CI run for T13.
-They ran on the first build of v0.0.0 (13625c1). The tag v0.0.0 was later moved to the code the FYP1
-report describes and its zips rebuilt; the changes since 13625c1 (index rebuilds in the server, the interface
-colours, the fine-tuned model as default with a model choice) were not re-tested on the testing machine.
+Records kept verbatim, apart from two things: the Windows runs captured qorfinder's UTF-8 output as
+Windows-1252, so "·" and "…" are restored here, and long temporary index folders read <tmp>.
+Up to the Windows T11 they come from the Windows testing machine, so paths read C:\Users\...; they were run
+on 22 and 23 Nov 2026 by one script with the zip of the final v0.0.0 (4fa29e5), the code the FYP1 report
+describes, downloaded from the GitHub release (sha256 fb3a1772a3d82d441e5354653e8a0ea3c890acd5f3df86fe072dd7dea9be4c5f).
+The Linux section after them ran on the first build of v0.0.0 (13625c1), before the index-rebuild fixes, the
+interface colours and the fine-tuned default model, which were not re-tested with the Linux zip.
+The last sections are the CI run for T13 and the T3 check.
 
 ==============================================================================
 T1: index a mixed folder, skipping bad files with a reason
 measures: which files are indexed or skipped (and why), chunk count, index time, peak memory
-commit:   release zip qorfinder-v0.0.0-windows-x86_64.zip (tag v0.0.0 = 13625c1), run as unpacked
+commit:   release zip qorfinder-v0.0.0-windows-x86_64.zip (tag v0.0.0 = 4fa29e5), run as unpacked
 machine:  Lenovo ThinkPad T590 (testing machine), Windows 10 Pro 22H2 (build 19045)
 commands: qorfinder --index-dir <tmp> index data/t1-mixed
 
-data/t1-mixed is rebuilt by `python3 scripts/prepare_system_tests.py` from CUAD_v1.zip and data/fixtures/:
-- the 10 PDF and 10 TXT below, copied unchanged from CUAD_v1/full_contract_pdf/ and full_contract_txt/;
-  Cybergy... Affiliate Agreement is there as both PDF and TXT on purpose: the next section shows its
-  governing-law clause at ranks 2 and 3 with the same score (0.606) from both extractors;
+data/t1-mixed is rebuilt by `python3 scripts/prepare_system_tests.py` from CUAD_v1.zip and data/fixtures/,
+and was rebuilt so on the testing machine before this run (34 files):
+- 10 PDF and 10 TXT, copied unchanged from CUAD_v1/full_contract_pdf/ and full_contract_txt/;
+  Cybergy... Affiliate Agreement is there as both PDF and TXT, to compare the two extractors;
 - 9 DOCX: the CUAD TXT of the same name, one paragraph per line;
 - corrupt.pdf: the first 4000 bytes of CreditcardscomInc_..._Affiliate Agreement.pdf;
 - over-50mb.txt: "This line pads the file past the fifty megabyte limit." 972,316 times with CRLF endings;
 - encrypted.pdf (LibreOffice PDF export with an open password), scanned.pdf (one page that is only an image)
   and fees.xlsx (a small LibreOffice spreadsheet), made by hand and committed in data/fixtures/.
-The v0.0.0 run below differs from the rebuilt folder in two ways. Its DOCX were converted by LibreOffice 26.8
-on Windows (same text, except that it read the "§" of ADAPTIMMUNE... as "Â§"), and it also held
-ADUROBIOTECH...CONSULTING AGREEMENT(1).docx, a byte-identical copy, since dropped. So it counts 30 documents
-and 2029 chunks; `qorfinder index --dry-run` on the rebuilt folder counts 29 and 2011, with the same chunks
-for every other file (ADAPTIMMUNE's after the "§" one character earlier) and the same five skips.
 
-folder: data/t1-mixed = 10 CUAD PDF, 10 DOCX (CUAD TXT converted by LibreOffice), 10 CUAD TXT, plus corrupt.pdf (first 4000 bytes of a CUAD PDF), encrypted.pdf (LibreOffice export with an open password), scanned.pdf (image-only page), over-50mb.txt (54,449,696 bytes), fees.xlsx
-
-109658	2ThemartComInc_19990826_10-12G_EX-10.10_6700288_EX-10.10_Co-Branding Agreement_ Agency Agreement.pdf
-14125	ABILITYINC_06_15_2020-EX-4.25-SERVICES AGREEMENT.docx
-9760	ACCELERATEDTECHNOLOGIESHOLDINGCORP_04_24_2003-EX-10.13-JOINT VENTURE AGREEMENT.docx
-32857	ACCURAYINC_09_01_2010-EX-10.31-DISTRIBUTOR AGREEMENT.docx
-14057	ADAMSGOLFINC_03_21_2005-EX-10.17-ENDORSEMENT AGREEMENT.docx
-34756	ADAPTIMMUNETHERAPEUTICSPLC_04_06_2017-EX-10.11-STRATEGIC ALLIANCE AGREEMENT.docx
-14610	ADIANUTRITION,INC_04_01_2005-EX-10.D2-RESELLER AGREEMENT.docx
-9664	ADMA BioManufacturing, LLC -  Amendment #3 to Manufacturing Agreement.docx
-9696	ADUROBIOTECH,INC_06_02_2020-EX-10.7-CONSULTING AGREEMENT(1).docx
-9696	ADUROBIOTECH,INC_06_02_2020-EX-10.7-CONSULTING AGREEMENT.docx
-38192	AFSALABANCORPINC_08_01_1996-EX-1.1-AGENCY AGREEMENT.docx
-130770	BLUEHILLSBANCORP,INC_05_20_2014-EX-1.1-AGENCY AGREEMENT.txt
-42473	BellringBrandsInc_20190920_S-1_EX-10.12_11817081_EX-10.12_Manufacturing Agreement1.txt
-56539	CARDAX,INC_08_19_2014-EX-10.1-COLLABORATION AGREEMENT.txt
-29756	CORALGOLDRESOURCES,LTD_05_28_2020-EX-4.1-CONSULTING AGREEMENT.txt
-20793	CnsPharmaceuticalsInc_20200326_8-K_EX-10.1_12079626_EX-10.1_Development Agreement.txt
-133922	CreditcardscomInc_20070810_S-1_EX-10.33_362297_EX-10.33_Affiliate Agreement.pdf
-134300	CybergyHoldingsInc_20140520_10-Q_EX-10.27_8605784_EX-10.27_Affiliate Agreement.pdf
-33829	CybergyHoldingsInc_20140520_10-Q_EX-10.27_8605784_EX-10.27_Affiliate Agreement.txt
-217908	DigitalCinemaDestinationsCorp_20111220_S-1_EX-10.10_7346719_EX-10.10_Affiliate Agreement.pdf
-172884	FOUNDATIONMEDICINE,INC_02_02_2015-EX-10.2-Collaboration Agreement.txt
-45042	HealthcentralCom_19991108_S-1A_EX-10.27_6623292_EX-10.27_Co-Branding Agreement.txt
-36622	KIROMICBIOPHARMA,INC_04_08_2020-EX-10.28-JOINT VENTURE AGREEMENT.txt
-46358	LegacyEducationAllianceInc_20200330_10-K_EX-10.18_12090678_EX-10.18_Development Agreement.txt
-88121	LinkPlusCorp_20050802_8-K_EX-10_3240252_EX-10_Affiliate Agreement.pdf
-88345	SouthernStarEnergyInc_20051202_SB-2A_EX-9_801890_EX-9_Affiliate Agreement.pdf
-81269	SteelVaultCorp_20081224_10-K_EX-10.16_3074935_EX-10.16_Affiliate Agreement.pdf
-275856	TubeMediaCorp_20060310_8-K_EX-10.1_513921_EX-10.1_Affiliate Agreement.pdf
-80849	UnionDentalHoldingsInc_20050204_8-KA_EX-10_3345577_EX-10_Affiliate Agreement.pdf
-107292	UsioInc_20040428_SB-2_EX-10.11_1723988_EX-10.11_Affiliate Agreement 2.pdf
-4000	corrupt.pdf
-22574	encrypted.pdf
-5648	fees.xlsx
-54449696	over-50mb.txt
-101769	scanned.pdf
-
-$ qorfinder --index-dir <tmp> index data/t1-mixed
+$ qorfinder --index-dir <tmp> index data\t1-mixed
 skipped C:\Users\hongye\Desktop\qorfinder\data\t1-mixed\fees.xlsx: unsupported file type
 skipped C:\Users\hongye\Desktop\qorfinder\data\t1-mixed\corrupt.pdf: cannot parse file: failed parsing cross reference table: invalid start value
 skipped C:\Users\hongye\Desktop\qorfinder\data\t1-mixed\encrypted.pdf: encrypted
 skipped C:\Users\hongye\Desktop\qorfinder\data\t1-mixed\over-50mb.txt: file is 54449696 bytes, over the 52428800 byte limit
 skipped C:\Users\hongye\Desktop\qorfinder\data\t1-mixed\scanned.pdf: no text layer
-indexed 30 document(s), 2029 chunk(s), 5 skipped, in 146.1 s (prepare 0.9 s, embed 145.1 s, 14.0 chunks/s)
-index saved to C:/Users/hongye/AppData/Local/Temp/claude/2b61473bf28aa62d/bc1247d7-0b97-440e-bcf0-301e1469b359/scratchpad/t1-index
-peak memory 1511.1 MB
+indexed 29 document(s), 1959 chunk(s), 5 skipped, in 122.2 s (prepare 1.0 s, embed 121.1 s, 16.2 chunks/s)
+peak memory 1353.7 MB
 
 ==============================================================================
 T1: search the mixed index
 measures: that results come from PDF, DOCX and TXT with file, page, character range and score
-commit:   release zip qorfinder-v0.0.0-windows-x86_64.zip (tag v0.0.0 = 13625c1), run as unpacked
+commit:   release zip qorfinder-v0.0.0-windows-x86_64.zip (tag v0.0.0 = 4fa29e5), run as unpacked
 machine:  Lenovo ThinkPad T590 (testing machine), Windows 10 Pro 22H2 (build 19045)
 commands: qorfinder --index-dir <tmp> search "<query>" -k 5
 
-$ qorfinder search "can the affiliate keep earning commission after the agreement ends?" -k 5
- 1. 0.685  UsioInc_20040428_SB-2_EX-10.11_1723988_EX-10.11_Affiliate Agreement 2.pdf
-           C:\Users\hongye\Desktop\qorfinder\data\t1-mixed · characters 19636–20693 · page 4
-           Section 5.02 [TERMINATION]A, Network 1 shall continue to pay to the
-           Affiliate the Affiliate's Fee described in Section 3.01 [AMOUNT]B for so
-           long as Network 1 continues to process transactions of the Merchants in
-           accordance with Schedule B attached hereto and Affiliate continues…
+$ qorfinder --index-dir <tmp> search "can the affiliate keep earning commission after the agreement ends?" -k 5
+ 1. 0.500  SouthernStarEnergyInc_20051202_SB-2A_EX-9_801890_EX-9_Affiliate Agreement.pdf
+           C:\Users\hongye\Desktop\qorfinder\data\t1-mixed · characters 20374–21052 · page 7
+           (2) Upon termination of the relationship under this agreement, the
+           Affiliate is obligated to undertake all of the technical measures
+           necessary to delete from its Web site all links that refer to the Web
+           sites of element 5 or to the Software Publisher. The same applies upon…
 
- 2. 0.667  TubeMediaCorp_20060310_8-K_EX-10.1_513921_EX-10.1_Affiliate Agreement.pdf
+ 2. 0.484  CreditcardscomInc_20070810_S-1_EX-10.33_362297_EX-10.33_Affiliate Agreement.pdf
+           C:\Users\hongye\Desktop\qorfinder\data\t1-mixed · characters 7566–8235 · page 4
+           The term of this Agreement will commence on the date that the Affiliate
+           Registration Form is approved by Chase and will end when terminated by
+           either party. Either Affiliate or Chase may terminate this Agreement at
+           any time, with or without cause, by giving the other party…
+
+ 3. 0.451  TubeMediaCorp_20060310_8-K_EX-10.1_513921_EX-10.1_Affiliate Agreement.pdf
+           C:\Users\hongye\Desktop\qorfinder\data\t1-mixed · characters 27878–28692 · page 9
+           (b) Network shall submit to Affiliate, within forty-five (45) days of
+           the end of each calendar quarter during the Term, a statement reporting
+           for such calendar quarter the following information on a
+           Station-by-Station basis: (i) Network’s Advertising Revenue, (ii) the
+           Affiliate…
+
+ 4. 0.447  DigitalCinemaDestinationsCorp_20111220_S-1_EX-10.10_7346719_EX-10.10_Affiliate Agreement.pdf
+           C:\Users\hongye\Desktop\qorfinder\data\t1-mixed · characters 5–70 · page 1
+           DIGITAL CINEMA DESTINATIONS CORP. NETWORK AFFILIATE AGREEMENT
+
+ 5. 0.442  TubeMediaCorp_20060310_8-K_EX-10.1_513921_EX-10.1_Affiliate Agreement.pdf
            C:\Users\hongye\Desktop\qorfinder\data\t1-mixed · characters 66774–67760 · page 23
            II.Affiliate Transactional Share. 1.Determining Affiliate Transactional
            Share. Commencing with the calendar quarter beginning on April 1, 2006
            and for each calendar quarter thereafter during the Term, Network shall
            pay to Affiliate the Affiliate Transactional Share. For purposes…
 
- 3. 0.661  SouthernStarEnergyInc_20051202_SB-2A_EX-9_801890_EX-9_Affiliate Agreement.pdf
-           C:\Users\hongye\Desktop\qorfinder\data\t1-mixed · characters 21056–22039 · page 8
-           Affiliate is only eligible to earn the Advertising Cost Compensation on
-           sales of Software Publishers Products occurring during the term of this
-           Agreement and fees earned up to the date termination will remain payable
-           only if the related orders are not cancelled or returned. If…
+5 result(s) in 11.8 ms (encode 10.9 ms, scan 0.9 ms) · peak memory 184.7 MB
 
- 4. 0.660  SouthernStarEnergyInc_20051202_SB-2A_EX-9_801890_EX-9_Affiliate Agreement.pdf
-           C:\Users\hongye\Desktop\qorfinder\data\t1-mixed · characters 8924–9890 · page 4
-           Publisher's Product under this Agreement and end user uses the automatic
-           ordering system that carries out the registration and payment
-           processing, so that the Affiliate's link is deemed to be directly
-           causative for the entry of the End User into the agreement with the
-           Software…
-
- 5. 0.660  UsioInc_20040428_SB-2_EX-10.11_1723988_EX-10.11_Affiliate Agreement 2.pdf
-           C:\Users\hongye\Desktop\qorfinder\data\t1-mixed · characters 18790–19635 · page 4
-           E. By Network 1 in the event any provision of the Sales Certificate or
-           the Code of Ethics is in breach by the Affiliate or Contractor(s)
-           located by Affiliate. F. Affiliate enters into a Processing agreement
-           with Network 1 and an ISO Sponsorship agreement with Harris Bank in
-           which…
-
-5 result(s) in 13.9 ms (encode 13.0 ms, scan 0.9 ms) · peak memory 184.8 MB
-
-$ qorfinder search "which state's law governs this agreement?" -k 5
- 1. 0.663  ADIANUTRITION,INC_04_01_2005-EX-10.D2-RESELLER AGREEMENT.docx
+$ qorfinder --index-dir <tmp> search "which state's law governs this agreement?" -k 5
+ 1. 0.437  ADIANUTRITION,INC_04_01_2005-EX-10.D2-RESELLER AGREEMENT.docx
            C:\Users\hongye\Desktop\qorfinder\data\t1-mixed · characters 24893–25692
            6.7 GOVERNING LAW. This Agreement shall be governed by and construed
            under the laws of the State of California, excluding conflict of laws
            provisions and excluding the 1980 United Nations Convention on Contracts
            for the International Sale of Goods. The parties consent to the…
 
- 2. 0.606  CybergyHoldingsInc_20140520_10-Q_EX-10.27_8605784_EX-10.27_Affiliate Agreement.pdf
-           C:\Users\hongye\Desktop\qorfinder\data\t1-mixed · characters 28684–29246 · page 13
-           This Agreement is accepted by Company in the State of Nevada and shall
-           be governed by and construed in accordance with the laws thereof, which
-           laws shall prevail in the event of any conflict. For such limited
-           purpose, MA hereby consents to the personal jurisdiction of any court…
+ 2. 0.425  ADAPTIMMUNETHERAPEUTICSPLC_04_06_2017-EX-10.11-STRATEGIC ALLIANCE AGREEMENT.docx
+           C:\Users\hongye\Desktop\qorfinder\data\t1-mixed · characters 77532–78630
+           facsimile or .pdf signed copies will constitute evidence of this
+           Agreement. 15.10 Export Control. Notwithstanding any other provision of
+           this Agreement, it is understood that the Parties are subject to, and
+           shall comply with, applicable United States laws, regulations, and…
 
- 3. 0.606  CybergyHoldingsInc_20140520_10-Q_EX-10.27_8605784_EX-10.27_Affiliate Agreement.txt
-           C:\Users\hongye\Desktop\qorfinder\data\t1-mixed · characters 28704–29266
-           This Agreement is accepted by Company in the State of Nevada and shall
-           be governed by and construed in accordance with the laws thereof, which
-           laws shall prevail in the event of any conflict. For such limited
-           purpose, MA hereby consents to the personal jurisdiction of any court…
+ 3. 0.414  ACCELERATEDTECHNOLOGIESHOLDINGCORP_04_24_2003-EX-10.13-JOINT VENTURE AGREEMENT.docx
+           C:\Users\hongye\Desktop\qorfinder\data\t1-mixed · characters 10292–11117
+           14. Construction. The Joint Venturers declare that in entering into this
+           Agreement, they have contracted with reference to the laws of the
+           Commonwealth of Pennsylvania, and the construction and interpretation of
+           the terms and provisions of this Agreement shall be interpreted and…
 
- 4. 0.590  CnsPharmaceuticalsInc_20200326_8-K_EX-10.1_12079626_EX-10.1_Development Agreement.txt
-           C:\Users\hongye\Desktop\qorfinder\data\t1-mixed · characters 19330–20320
-           together shall constitute a single agreement. 9.7 If any provision of
-           this Agreement or application thereof to anyone is adjudicated to be
-           invalid or unenforceable, such invalidity or unenforceability shall not
-           affect any provision or application of this Agreement which can be…
+ 4. 0.406  ADAPTIMMUNETHERAPEUTICSPLC_04_06_2017-EX-10.11-STRATEGIC ALLIANCE AGREEMENT.docx
+           C:\Users\hongye\Desktop\qorfinder\data\t1-mixed · characters 79236–79457
+           as they pertain to MD Anderson are enforceable only to the extent
+           authorized by the constitution and laws of the State of Texas;
+           accordingly, to the extent any provision hereof conflicts with the
+           constitution or laws 19
 
- 5. 0.589  DigitalCinemaDestinationsCorp_20111220_S-1_EX-10.10_7346719_EX-10.10_Affiliate Agreement.pdf
-           C:\Users\hongye\Desktop\qorfinder\data\t1-mixed · characters 99854–100338 · page 30
-           (v) agrees to the entry of an order to enforce any resolution,
-           settlement, order or award made pursuant to this Section by the state
-           and federal courts located in New York, New York and in connection
-           therewith hereby waives, and agrees not to assert by way of motion, as
-           a…
+ 5. 0.372  ADAPTIMMUNETHERAPEUTICSPLC_04_06_2017-EX-10.11-STRATEGIC ALLIANCE AGREEMENT.docx
+           C:\Users\hongye\Desktop\qorfinder\data\t1-mixed · characters 41640–42602
+           the provisions of Section 6.2 and 6.3 shall not apply, and MD Anderson
+           shall have the sole responsibility for monitoring, auditing, and
+           reporting for such Study, provided that MD Anderson agrees to reasonably
+           negotiate access to Study documentation and records relevant to the…
 
-5 result(s) in 15.1 ms (encode 13.9 ms, scan 1.2 ms) · peak memory 184.8 MB
+5 result(s) in 12.3 ms (encode 11.4 ms, scan 0.8 ms) · peak memory 184.7 MB
 
 ==============================================================================
 T5, T8, T12 and the token checks: serve
 measures: the local API refuses calls without the token or with a foreign Host; files open from the UI; search works offline
-commit:   release zip qorfinder-v0.0.0-windows-x86_64.zip (tag v0.0.0 = 13625c1), run as unpacked
+commit:   release zip qorfinder-v0.0.0-windows-x86_64.zip (tag v0.0.0 = 4fa29e5), run as unpacked
 machine:  Lenovo ThinkPad T590 (testing machine), Windows 10 Pro 22H2 (build 19045)
-commands: qorfinder --index-dir <tmp> serve
-          then the API calls below and the browser checks
+commands: qorfinder --index-dir <tmp> serve, then the API calls below from PowerShell
 
-$ qorfinder --index-dir <tmp> serve        (release zip, unpacked, Windows 10 Pro 22H2)
-QorFinder is running at http://127.0.0.1:58545/?token=<32 hex digits>
+$ qorfinder --index-dir <tmp> serve
+QorFinder is running at http://127.0.0.1:8765/?token=<32 hex digits>
 
-GET /?token=...                                   -> 200 (UI served)
-GET /api/status        without token header       -> 403
-GET /api/status        with token, Host: evil.example -> 403
-GET /api/status        with token                 -> ready, 30 documents, 2029 chunks
-GET /api/search?q=which state's law governs this agreement&k=2 -> rank 1 ADIANUTRITION ... RESELLER AGREEMENT.docx, characters 24893-25692 ("6.7 GOVERNING LAW ...")
+-- token checks (expected 403, 403, 200)
+no token -> {"error":"missing or wrong token"} 403
+token, Host: evil.example -> {"error":"wrong host"} 403
+token -> {"index_dir":"<tmp>","ready":true,"documents":29,"chunks":1959, ...}
+-- model list (the Documents view shows these)
+{
+    "index_dir":  "<tmp>",
+    "ready":  true,
+    "documents":  29,
+    "chunks":  1959,
+    "source_folder":  "C:\\Users\\hongye\\Desktop\\qorfinder\\data\\t1-mixed",
+    "problem":  null,
+    "model":  "all-MiniLM-L6-v2-ft-cuad",
+    "models":  [
+                   "all-MiniLM-L6-v2-ft-cuad",
+                   "sentence-transformers/all-MiniLM-L6-v2"
+               ]
+}
+-- T12: top 10 of every test query, saved to t12-results.json
+34 queries saved
+-- T5: open file through the API (the apps open on screen; close them afterwards)
+query: can the affiliate keep earning commission after the agreement ends?
+{
+    "char_end":  21052,
+    "char_start":  20374,
+    "chunk_id":  1780,
+    "file":  "SouthernStarEnergyInc_20051202_SB-2A_EX-9_801890_EX-9_Affiliate Agreement.pdf",
+    "folder":  "C:\\Users\\hongye\\Desktop\\qorfinder\\data\\t1-mixed",
+    "page":  7,
+    "score":  0.4998666048049927,
+    "text":  "(2) Upon termination of the relationship under this agreement, the\nAf…"
+}
+open -> HTTP 204
+query: which state's law governs this agreement?
+{
+    "char_end":  25692,
+    "char_start":  24893,
+    "chunk_id":  435,
+    "file":  "ADIANUTRITION,INC_04_01_2005-EX-10.D2-RESELLER AGREEMENT.docx",
+    "folder":  "C:\\Users\\hongye\\Desktop\\qorfinder\\data\\t1-mixed",
+    "page":  null,
+    "score":  0.43706604838371277,
+    "text":  "6.7 GOVERNING LAW. This Agreement shall be governed by and construed u…"
+}
+open -> HTTP 204
 
-Checked by the developer in the browser:
-- Search "can the affiliate keep earning commission after the agreement ends?", Open file on rank 1
-  (UsioInc_20040428_SB-2_EX-10.11_1723988_EX-10.11_Affiliate Agreement 2.pdf, page 4):
-  the PDF opened with no error and "Section 5.02 [TERMINATION]" is on page 4.  -> T5 (PDF), T12 (page)
-- Wi-Fi turned off, searched again: results returned as before.                 -> T8
-- Search "which state's law governs this agreement?", Open file on rank 1
-  (ADIANUTRITION,INC_04_01_2005-EX-10.D2-RESELLER AGREEMENT.docx): opened correctly.     -> T5 (DOCX)
+-- T8: search with every network adapter disabled
+adapters switched off: Wi-Fi
+adapters up now: 0
+offline search returned 3 results; first: SouthernStarEnergyInc_20051202_SB-2A_EX-9_801890_EX-9_Affiliate Agreement.pdf
+adapters switched back on
+HTTP 204 is the server's reply once Windows has accepted the file for its default application (opener::open,
+crates/qf-cli/src/serve.rs). Checked by the developer on the screen: both files opened as expected in their
+default applications. The PDF passage (characters 20374-21052) starts on page 7, the reported page, in
+pypdf's text too (T12 method).
 
 ==============================================================================
 T7: add, modify and delete a file, then rebuild
 measures: that a rebuild picks up added, changed and deleted files
-commit:   release zip qorfinder-v0.0.0-windows-x86_64.zip (tag v0.0.0 = 13625c1), run as unpacked
+commit:   release zip qorfinder-v0.0.0-windows-x86_64.zip (tag v0.0.0 = 4fa29e5), run as unpacked
 machine:  Lenovo ThinkPad T590 (testing machine), Windows 10 Pro 22H2 (build 19045)
 commands: qorfinder index data/t7-change; qorfinder search ... (before and after each change)
 
@@ -197,227 +192,240 @@ commands: qorfinder index data/t7-change; qorfinder search ... (before and after
 A-collaboration.txt = CARDAX,INC_08_19_2014-EX-10.1-COLLABORATION AGREEMENT.txt,
 B-consulting.txt = CORALGOLDRESOURCES,LTD_05_28_2020-EX-4.1-CONSULTING AGREEMENT.txt,
 C-development.txt = CnsPharmaceuticalsInc_20200326_8-K_EX-10.1_12079626_EX-10.1_Development Agreement.txt.
-The changes were then made by hand, in a Windows editor that saved B-consulting.txt with CRLF endings:
-step 2: add D-new.txt holding the line
+The rerun script then made the changes with PowerShell:
+step 2: Set-Content D-new.txt with the line
           ADDENDUM. The Licensee shall plant one olive tree for every hundred units sold under this Agreement.
-        append an empty line and
+        Add-Content to B-consulting.txt a CRLF and
           12. REPORTS. The Consultant shall deliver every written report to the Company by registered courier in a sealed envelope.
-        to B-consulting.txt, and delete C-development.txt;
+        and delete C-development.txt;
 step 4: in clause 20.1 of B-consulting.txt replace
           "by pre-paid registered mail, by facsimile transmission or electronic mail" with "only by carrier pigeon".
-
-folder: data/t7-change, three CUAD TXT files copied as A-collaboration.txt, B-consulting.txt, C-development.txt
+Each result below is its rank line and location; snippets are left out except for the in-clause edit.
 
 == 1. before the change
-indexed 3 document(s), 149 chunk(s), 0 skipped, in 10.8 s (prepare 0.0 s, embed 10.7 s, 13.9 chunks/s)
-
-$ qorfinder search "who must plant an olive tree for every hundred units sold?" -k 3
- 1. 0.237  A-collaboration.txt
-           CAPSUGEL shall manufacture the Product for each Marketer unless
- 2. 0.222  B-consulting.txt
-           THIS IS SCHEDULE "A" TO THE CONSULTING AGREEMENT BETWEEN CORAL GOLD
-           RESOURCES LTD. AND lNTERMARK CAPlTAL CORP. Description of Consulting
-           Services: The Consultant shall provide management and financial
- 3. 0.206  A-collaboration.txt
-           C:\Users\hongye\Desktop\qorfinder\data\t7-change · characters 12834–13101
-           technical, intellectual property and regulatory aspects and keep the
-
-$ qorfinder search "how must the consultant deliver the reports?" -k 3
- 1. 0.550  B-consulting.txt
-           Consultant hereby accepts such appointment and engagement by the
-           Company, all upon and subject to the terms and conditions of this
-           Agreement. 2.…
- 2. 0.521  B-consulting.txt
- 3. 0.503  B-consulting.txt
-           THIS IS SCHEDULE "A" TO THE CONSULTING AGREEMENT BETWEEN CORAL GOLD
-           RESOURCES LTD. AND lNTERMARK CAPlTAL CORP. Description of Consulting
-           Services: The Consultant shall provide management and financial
-           C:\Users\hongye\Desktop\qorfinder\data\t7-change · characters 1562–2540
-           1.1 The Company hereby appoints and engages the Consultant as a
-
-$ qorfinder search "CNS Pharmaceuticals development agreement" -k 3
- 1. 0.662  C-development.txt
- 2. 0.661  C-development.txt
- 3. 0.661  C-development.txt
-           C:\Users\hongye\Desktop\qorfinder\data\t7-change · characters 17112–17164
-           4 Source: CNS PHARMACEUTICALS, INC., 8-K, 3/26/2020
-
-== 2. change: add D-new.txt, append a sentence to B-consulting.txt, delete C-development.txt
+$ qorfinder --index-dir <tmp> index data\t7-change
+indexed 3 document(s), 145 chunk(s), 0 skipped, in 11.3 s (prepare 0.0 s, embed 11.2 s, 13.0 chunks/s)
+$ qorfinder --index-dir <tmp> search "who must plant an olive tree for every hundred units sold?" -k 3
+ 1. 0.224  A-collaboration.txt · characters 11967–13064
+ 2. 0.215  A-collaboration.txt · characters 8743–9803
+ 3. 0.209  B-consulting.txt · characters 2542–2612
+$ qorfinder --index-dir <tmp> search "how must the consultant deliver the reports?" -k 3
+ 1. 0.376  B-consulting.txt · characters 27240–28359
+ 2. 0.334  B-consulting.txt · characters 1562–2540
+ 3. 0.301  B-consulting.txt · characters 2542–2612
+$ qorfinder --index-dir <tmp> search "CNS Pharmaceuticals development agreement" -k 3
+ 1. 0.463  C-development.txt · characters 20639–20791
+ 2. 0.403  A-collaboration.txt · characters 7950–8940
+ 3. 0.373  A-collaboration.txt · characters 8743–9803
 
 == 3. after rebuilding
-indexed 3 document(s), 118 chunk(s), 0 skipped, in 10.5 s (prepare 0.0 s, embed 10.4 s, 11.3 chunks/s)
+$ qorfinder --index-dir <tmp> index data\t7-change
+indexed 3 document(s), 118 chunk(s), 0 skipped, in 7.6 s (prepare 0.0 s, embed 7.5 s, 15.7 chunks/s)
+$ qorfinder --index-dir <tmp> search "who must plant an olive tree for every hundred units sold?" -k 3
+ 1. 0.735  D-new.txt · characters 0–100
+ 2. 0.224  A-collaboration.txt · characters 11967–13064
+ 3. 0.215  A-collaboration.txt · characters 8743–9803
+$ qorfinder --index-dir <tmp> search "how must the consultant deliver the reports?" -k 3
+ 1. 0.376  B-consulting.txt · characters 27240–28359
+ 2. 0.334  B-consulting.txt · characters 1562–2540
+ 3. 0.301  B-consulting.txt · characters 2542–2612
+$ qorfinder --index-dir <tmp> search "CNS Pharmaceuticals development agreement" -k 50
+   (50 results; C-development.txt among them: 0)
+ 1. 0.403  A-collaboration.txt · characters 7950–8940
+ 2. 0.373  A-collaboration.txt · characters 8743–9803
+ 3. 0.359  A-collaboration.txt · characters 10367–10753
 
-$ qorfinder search "who must plant an olive tree for every hundred units sold?" -k 3
- 1. 0.830  D-new.txt
-           ADDENDUM. The Licensee shall plant one olive tree for every hundred
- 2. 0.237  A-collaboration.txt
-           CAPSUGEL shall manufacture the Product for each Marketer unless
- 3. 0.222  B-consulting.txt
-           THIS IS SCHEDULE "A" TO THE CONSULTING AGREEMENT BETWEEN CORAL GOLD
-           RESOURCES LTD. AND lNTERMARK CAPlTAL CORP. Description of Consulting
-           Services: The Consultant shall provide management and financial
-           C:\Users\hongye\Desktop\qorfinder\data\t7-change · characters 0–100
-           ADDENDUM. The Licensee shall plant one olive tree for every hundred
+== 4. before the second change
+$ qorfinder --index-dir <tmp> search "can notices be sent by carrier pigeon?" -k 1
+ 1. 0.393  B-consulting.txt · characters 23230–23423
+           which it was so faxed (or the next business day if the day of sending is
+           not a business day). The parties may give from time to time written
+           notice of change of address in the manner aforesaid.
+clause 20.1 wording found: True
 
-$ qorfinder search "how must the consultant deliver the reports?" -k 3
- 1. 0.550  B-consulting.txt
-           Consultant hereby accepts such appointment and engagement by the
-           Company, all upon and subject to the terms and conditions of this
-           Agreement. 2.…
- 2. 0.521  B-consulting.txt
- 3. 0.503  B-consulting.txt
-           THIS IS SCHEDULE "A" TO THE CONSULTING AGREEMENT BETWEEN CORAL GOLD
-           RESOURCES LTD. AND lNTERMARK CAPlTAL CORP. Description of Consulting
-           Services: The Consultant shall provide management and financial
-           C:\Users\hongye\Desktop\qorfinder\data\t7-change · characters 1562–2540
-           1.1 The Company hereby appoints and engages the Consultant as a
-
-$ qorfinder search "CNS Pharmaceuticals development agreement" -k 3
- 1. 0.429  A-collaboration.txt
- 2. 0.426  A-collaboration.txt
- 3. 0.415  B-consulting.txt
-           C:\Users\hongye\Desktop\qorfinder\data\t7-change · characters 11967–13064
-           the dates determined a s reasonably necessary for conducting all
-
-C-development.txt in any of the top 50 results for the delete query after rebuilding:
-0
-
-== 4. second modify: edit wording inside an existing clause (B-consulting.txt, 20.1 notices)
-$ qorfinder search "can notices be sent by carrier pigeon?" -k 1   (before)
- 1. 0.427  B-consulting.txt
-           C:\Users\hongye\Desktop\qorfinder\data\t7-change · characters 22457–23405
+== 4. after rebuilding
+$ qorfinder --index-dir <tmp> index data\t7-change
+indexed 3 document(s), 117 chunk(s), 0 skipped, in 9.2 s (prepare 0.0 s, embed 9.1 s, 12.9 chunks/s)
+$ qorfinder --index-dir <tmp> search "can notices be sent by carrier pigeon?" -k 1
+ 1. 0.399  B-consulting.txt · characters 22457–23390
            20.1 All notices required or permitted under this Agreement shall be in
-changed: "by pre-paid registered mail, by facsimile transmission or electronic mail" -> "only by carrier pigeon"
-indexed 3 document(s), 117 chunk(s), 0 skipped, in 8.4 s (prepare 0.0 s, embed 8.3 s, 14.1 chunks/s)
-$ qorfinder search "can notices be sent by carrier pigeon?" -k 1   (after rebuilding)
- 1. 0.546  B-consulting.txt
-           C:\Users\hongye\Desktop\qorfinder\data\t7-change · characters 22641–23576
-           20.1 All notices required or permitted under this Agreement shall be in
+           writing and shall be given by delivering such notice or mailing such
+           notice only by carrier pigeon to the addresses provided under the names
+           of each party on the first page to this Agreement. Any such notice…
 
-== 5. rank of the appended clause (chunk #39 of B-consulting.txt, characters 29144-29872, after step 3)
-"how must the consultant deliver the reports?"                     -> rank 20, score 0.393
-exact sentence "The Consultant shall deliver every written report ..." -> rank 13, score 0.442
-index --dry-run shows the clause was merged into the file's last chunk with ~700 characters of unrelated text.
+== 5. rank of the appended clause
+$ qorfinder --index-dir <tmp> search "how must the consultant deliver the reports?" -k 30
+   (30 results; B-consulting.txt's last chunk, 29093–29821, which holds the appended clause:)
+12. 0.188  B-consulting.txt · characters 29093–29821
+$ qorfinder --index-dir <tmp> search "The Consultant shall deliver every written report to the Company by registered courier in a sealed envelope." -k 30
+   (30 results; B-consulting.txt's last chunk, 29093–29821, which holds the appended clause:)
+ 6. 0.275  B-consulting.txt · characters 29093–29821
+
+`qorfinder index --dry-run` on the dev machine, on B-consulting.txt rebuilt with the same two changes, gives
+the same chunk ranges (39 chunks; 20.1 is #30, 22457–23390) and shows the appended clause in the last chunk,
+#38 [29093..29821], after about 600 characters of the Schedule A duties list.
 
 == summary
-add:    D-new.txt indexed; its clause is rank 1 (0.830) after rebuilding, absent before.
-delete: C-development.txt gone; 0 of the top 50 results for its query after rebuilding (rank 1-3 before).
-modify: both edits reached the index (new chunk text, ranges and scores). The in-clause edit stayed rank 1 (0.427 -> 0.546).
-        The clause appended at the end of a file was indexed but ranked 13th even for its exact wording,
-        because it shares a chunk with unrelated text.
+add:    D-new.txt indexed; its clause is rank 1 (0.735) after rebuilding, absent before.
+delete: C-development.txt gone; 0 of the top 50 results for its query after rebuilding (rank 1, 0.463, before).
+modify: both edits reached the index. After the in-clause edit, rank 1 for its query is the 20.1 chunk with the
+        new wording (0.399; before, rank 1 was the end of 20.1, 0.393).
+        The clause appended at the end of a file was indexed but ranked 6th even for its exact wording, and
+        12th for the paraphrased query, because it shares a chunk with unrelated text.
 
 ==============================================================================
 T12: page numbers of PDF results
 measures: that the page reported for a PDF result is the page the passage starts on
-commit:   release zip qorfinder-v0.0.0-windows-x86_64.zip (tag v0.0.0 = 13625c1), run as unpacked
+commit:   release zip qorfinder-v0.0.0-windows-x86_64.zip (tag v0.0.0 = 4fa29e5), run as unpacked
 machine:  Lenovo ThinkPad T590 (testing machine), Windows 10 Pro 22H2 (build 19045)
 commands: qorfinder --index-dir <tmp> serve; /api/search?q=<test query>&k=10 for each query in data/testset/queries.jsonl
 
-T12: 20 PDF results from the test queries over data/t1-mixed (release v0.0.0, Windows 10)
+T12: 20 PDF results from the test queries over data/t1-mixed (release v0.0.0 = 4fa29e5, Windows 10)
 Results picked: for each test query in order, its highest-ranked PDF result (top 10) not already listed, until 20.
-Check: the first 8 words of the passage (letters and digits only) were searched in every page's text as read by
-pypdf 5.1.0, a PDF reader independent of the pdf-extract/lopdf used by QorFinder.
+Check, on the dev machine: the first 8 words of the passage (letters and digits only) were searched in every
+page's text as read by pypdf 7.1.1 (from nixpkgs), a PDF reader independent of the pdf-extract/lopdf used by
+QorFinder, in the same PDFs read from CUAD_v1.zip, from which data/t1-mixed copies them unchanged.
 Result: 20 of 20 found on the reported page and on no other page.
 
  1. [Q01m] rank 1: "license granted to the licensee and its affiliates"
-    DigitalCinemaDestinationsCorp_20111220_S-1_EX-10.10_7346719_EX-10.10_Affiliate Agreement.pdf · page 27 · characters 87900-88839
-    starts: "(collectively, “Derived Works”), shall be owned solely and exclusively by NCM, and ..."
-    check: found on page 27 only (ok)
+    UsioInc_20040428_SB-2_EX-10.11_1723988_EX-10.11_Affiliate Agreement 2.pdf · page 1 · characters 2272-2339
+    starts: "ARTICLE I [OBLIGATIONS OF AFFILIATES] OBLIGATIONS OF AFFILIATES ..."
+    check: found on page 1 only (ok)
 
- 2. [Q01p] rank 2: "permission to use the rights also extends to companies in the same corporate group as the recipient"
-    CybergyHoldingsInc_20140520_10-Q_EX-10.27_8605784_EX-10.27_Affiliate Agreement.pdf · page 2 · characters 1978-3035
-    starts: "General Rights. Subject to the terms and conditions of this Agreement, Company ..."
-    check: found on page 2 only (ok)
+ 2. [Q01p] rank 1: "permission to use the rights also extends to companies in the same corporate group as the recipient"
+    UsioInc_20040428_SB-2_EX-10.11_1723988_EX-10.11_Affiliate Agreement 2.pdf · page 3 · characters 11876-12763
+    starts: "B. Affiliate acknowledges and agrees that all merchants and subscribing businesses referred ..."
+    check: found on page 3 only (ok)
 
- 3. [Q02m] rank 2: "exceptions or carveouts to the non-compete, exclusivity and no-solicit of customers restrictions"
+ 3. [Q02m] rank 1: "exceptions or carveouts to the non-compete, exclusivity and no-solicit of customers restrictions"
     DigitalCinemaDestinationsCorp_20111220_S-1_EX-10.10_7346719_EX-10.10_Affiliate Agreement.pdf · page 18 · characters 57853-58911
-    starts: "Section 3.11 (Grand Openings, Employee Uniforms), collectively, the “Exclusivity Exceptions”, Network Affiliate ..."
+    starts: "Section 3.11 (Grand Openings, Employee Uniforms), collectively, the âExclusivity Exceptionsâ, Network Affiliate ..."
     check: found on page 18 only (ok)
 
- 4. [Q02p] rank 3: "situations where a party may still run a rival business or approach the other side's clients despite the limits"
-    DigitalCinemaDestinationsCorp_20111220_S-1_EX-10.10_7346719_EX-10.10_Affiliate Agreement.pdf · page 25 · characters 82128-83225
-    starts: "(a) During the Term, except as otherwise provided in this Agreement, Network ..."
-    check: found on page 25 only (ok)
+ 4. [Q02p] rank 2: "situations where a party may still run a rival business or approach the other side's clients despite the limits"
+    DigitalCinemaDestinationsCorp_20111220_S-1_EX-10.10_7346719_EX-10.10_Affiliate Agreement.pdf · page 18 · characters 58667-59709
+    starts: "the Advertising Services. NCM shall be responsible, at its own expense, for ..."
+    check: found on page 18 only (ok)
 
- 5. [Q03m] rank 3: "party restricted from contesting the validity of the counterparty's intellectual property ownership or bringing a claim against it"
-    DigitalCinemaDestinationsCorp_20111220_S-1_EX-10.10_7346719_EX-10.10_Affiliate Agreement.pdf · page 27 · characters 87192-88074
-    starts: "Section 12.2 Derived Works. Any and all data, information, and material created, ..."
-    check: found on page 27 only (ok)
-
- 6. [Q03p] rank 1: "promise never to dispute the other side's title to its patents and trademarks or start legal action against it"
-    CybergyHoldingsInc_20140520_10-Q_EX-10.27_8605784_EX-10.27_Affiliate Agreement.pdf · page 7 · characters 15315-16322
-    starts: "Company agrees to defend or, at its option, settle any claim or ..."
+ 5. [Q03m] rank 2: "party restricted from contesting the validity of the counterparty's intellectual property ownership or bringing a claim against it"
+    CreditcardscomInc_20070810_S-1_EX-10.33_362297_EX-10.33_Affiliate Agreement.pdf · page 7 · characters 15959-16231
+    starts: "from a third party under no obligation to the disclosing party; (iv) ..."
     check: found on page 7 only (ok)
 
- 7. [Q04p] rank 5: "permission to use the rights that lasts forever and cannot be withdrawn"
-    DigitalCinemaDestinationsCorp_20111220_S-1_EX-10.10_7346719_EX-10.10_Affiliate Agreement.pdf · page 6 · characters 16385-16717
-    starts: "shall not be permitted to permanently discontinue Service to any Theatre without ..."
-    check: found on page 6 only (ok)
+ 6. [Q03p] rank 2: "promise never to dispute the other side's title to its patents and trademarks or start legal action against it"
+    DigitalCinemaDestinationsCorp_20111220_S-1_EX-10.10_7346719_EX-10.10_Affiliate Agreement.pdf · page 16 · characters 51491-52350
+    starts: "(f) Network Affiliate agrees not to use or adopt (i) any trademark ..."
+    check: found on page 16 only (ok)
 
- 8. [Q05m] rank 3: "joint or shared ownership of intellectual property between the parties"
+ 7. [Q04p] rank 3: "permission to use the rights that lasts forever and cannot be withdrawn"
+    DigitalCinemaDestinationsCorp_20111220_S-1_EX-10.10_7346719_EX-10.10_Affiliate Agreement.pdf · page 21 · characters 68035-68222
+    starts: "Section 8.4 Survival. Sections 2.3, 5.2, 5.3, 5.4, 8.4, 8.5, 11.1, 11.2, ..."
+    check: found on page 21 only (ok)
+
+ 8. [Q05m] rank 1: "joint or shared ownership of intellectual property between the parties"
+    LinkPlusCorp_20050802_8-K_EX-10_3240252_EX-10_Affiliate Agreement.pdf · page 2 · characters 7251-8324
+    starts: "New software and hardware designs and intellectual property developed in the course ..."
+    check: found on page 2 only (ok)
+
+ 9. [Q05p] rank 1: "inventions and patents created together belong to both sides"
     DigitalCinemaDestinationsCorp_20111220_S-1_EX-10.10_7346719_EX-10.10_Affiliate Agreement.pdf · page 14 · characters 43806-43838
     starts: "ARTICLE V INTELLECTUAL PROPERTY ..."
     check: found on page 14 only (ok)
 
- 9. [Q06m] rank 2: "liquidated damages for breach or a termination fee"
-    CybergyHoldingsInc_20140520_10-Q_EX-10.27_8605784_EX-10.27_Affiliate Agreement.pdf · page 10 · characters 22038-23059
-    starts: "Termination. This Agreement may be terminated by either party at the expiration ..."
-    check: found on page 10 only (ok)
+10. [Q06m] rank 5: "liquidated damages for breach or a termination fee"
+    TubeMediaCorp_20060310_8-K_EX-10.1_513921_EX-10.1_Affiliate Agreement.pdf · page 13 · characters 44269-44543
+    starts: "pursuant to Sections 10(a) or (c), Affiliate shall, within thirty (30) days ..."
+    check: found on page 13 only (ok)
 
-10. [Q06p] rank 5: "fixed sum agreed in advance that one side pays if it breaks the deal or ends it early"
+11. [Q06p] rank 4: "fixed sum agreed in advance that one side pays if it breaks the deal or ends it early"
     SouthernStarEnergyInc_20051202_SB-2A_EX-9_801890_EX-9_Affiliate Agreement.pdf · page 4 · characters 10423-11280
     starts: "(5) The Advertising Cost Compensation shall not be paid if and insofar ..."
     check: found on page 4 only (ok)
 
-11. [Q07m] rank 10: "most favored nation clause entitling the buyer to better terms given to a third party"
-    UnionDentalHoldingsInc_20050204_8-KA_EX-10_3345577_EX-10_Affiliate Agreement.pdf · page 2 · characters 8774-9158
-    starts: "b. Amendment. This Agreement may not be modified or amended, except in ..."
-    check: found on page 2 only (ok)
-
-12. [Q07p] rank 10: "if the seller gives another customer a lower price, this purchaser must receive the same price"
-    CybergyHoldingsInc_20140520_10-Q_EX-10.27_8605784_EX-10.27_Affiliate Agreement.pdf · page 15 · characters 31291-32166
-    starts: "Note 2: Note 3: Note 4: Note 5: Note 6: 2. (a) ..."
-    check: found on page 15 only (ok)
-
-13. [Q08m] rank 1: "restriction on soliciting or contracting with the counterparty's customers or partners"
-    UsioInc_20040428_SB-2_EX-10.11_1723988_EX-10.11_Affiliate Agreement 2.pdf · page 1 · characters 2341-3492
-    starts: "1.01 CONTRACTORS. Affiliate shall use its best efforts to market and sell ..."
-    check: found on page 1 only (ok)
-
-14. [Q09m] rank 3: "restriction on soliciting or hiring the counterparty's employees or contractors"
-    2ThemartComInc_19990826_10-12G_EX-10.10_6700288_EX-10.10_Co-Branding Agreement_ Agency Agreement.pdf · page 8 · characters 23402-24386
-    starts: "12.4 FORCE MAJEURE. Except as otherwise provided, if performance hereunder (other than ..."
+12. [Q07p] rank 1: "if the seller gives another customer a lower price, this purchaser must receive the same price"
+    TubeMediaCorp_20060310_8-K_EX-10.1_513921_EX-10.1_Affiliate Agreement.pdf · page 8 · characters 24374-24688
+    starts: "(c) Each Station transmitting the Service shall transmit a good-quality video and ..."
     check: found on page 8 only (ok)
 
-15. [Q09p] rank 2: "must not try to recruit or lure away the other company's staff"
+13. [Q08m] rank 1: "restriction on soliciting or contracting with the counterparty's customers or partners"
+    UsioInc_20040428_SB-2_EX-10.11_1723988_EX-10.11_Affiliate Agreement 2.pdf · page 4 · characters 20476-21061
+    starts: "1 for any product offered through Network 1, Affiliate shall not approach, ..."
+    check: found on page 4 only (ok)
+
+14. [Q08p] rank 2: "must not approach or poach the other company's clients to win their business"
+    SteelVaultCorp_20081224_10-K_EX-10.16_3074935_EX-10.16_Affiliate Agreement.pdf · page 2 · characters 6476-7422
+    starts: "3. Operational Specifications. Marketing Affiliate and Equidata shall agree upon Operational Specifications ..."
+    check: found on page 2 only (ok)
+
+15. [Q09m] rank 1: "restriction on soliciting or hiring the counterparty's employees or contractors"
+    SteelVaultCorp_20081224_10-K_EX-10.16_3074935_EX-10.16_Affiliate Agreement.pdf · page 4 · characters 16573-17452
+    starts: "benefits. Nothing in the Agreement shall be construed as making either party ..."
+    check: found on page 4 only (ok)
+
+16. [Q09p] rank 2: "must not try to recruit or lure away the other company's staff"
     DigitalCinemaDestinationsCorp_20111220_S-1_EX-10.10_7346719_EX-10.10_Affiliate Agreement.pdf · page 26 · characters 83680-84561
     starts: "(b) During the Term and for a period of twelve (12) months ..."
     check: found on page 26 only (ok)
 
-16. [Q10m] rank 2: "restriction on a party competing with the counterparty in a geography or business sector"
-    TubeMediaCorp_20060310_8-K_EX-10.1_513921_EX-10.1_Affiliate Agreement.pdf · page 15 · characters 50776-51609
-    starts: "(c) Governing Law. The obligations of Affiliate and Network under this Agreement ..."
-    check: found on page 15 only (ok)
+17. [Q10m] rank 6: "restriction on a party competing with the counterparty in a geography or business sector"
+    UsioInc_20040428_SB-2_EX-10.11_1723988_EX-10.11_Affiliate Agreement 2.pdf · page 2 · characters 6549-7363
+    starts: "1.06 RESTRICTED MERCHANTS AND MERCHANT ACTIVITIES. Affiliate shall market only to bona ..."
+    check: found on page 2 only (ok)
 
-17. [Q10p] rank 3: "must not set up a rival firm in the same territory or market as the other side"
-    TubeMediaCorp_20060310_8-K_EX-10.1_513921_EX-10.1_Affiliate Agreement.pdf · page 12 · characters 38310-38919
-    starts: "(d) Affiliate and Network shall each indemnify, defend and forever hold harmless ..."
-    check: found on page 12 only (ok)
+18. [Q10p] rank 5: "must not set up a rival firm in the same territory or market as the other side"
+    SteelVaultCorp_20081224_10-K_EX-10.16_3074935_EX-10.16_Affiliate Agreement.pdf · page 1 · characters 1606-1883
+    starts: "3. Marketing Affiliate wishes to market the Services indirectly through third party ..."
+    check: found on page 1 only (ok)
 
-18. [Q11m] rank 2: "requirement on a party not to disparage the counterparty"
-    DigitalCinemaDestinationsCorp_20111220_S-1_EX-10.10_7346719_EX-10.10_Affiliate Agreement.pdf · page 14 · characters 43258-43801
-    starts: "Party. The parties agree that this exclusive remedy is essential to the ..."
-    check: found on page 14 only (ok)
-
-19. [Q11p] rank 5: "must not say negative things that damage the other company's reputation"
-    SteelVaultCorp_20081224_10-K_EX-10.16_3074935_EX-10.16_Affiliate Agreement.pdf · page 4 · characters 13473-14418
-    starts: "11. Liability. MARKETING AFFILIATE ACKNOWLEDGES AND AGREES THAT ANY PRODUCT, SERVICE, LICENSE ..."
+19. [Q11m] rank 2: "requirement on a party not to disparage the counterparty"
+    CybergyHoldingsInc_20140520_10-Q_EX-10.27_8605784_EX-10.27_Affiliate Agreement.pdf · page 4 · characters 7421-8427
+    starts: "Business Practices. Company shall not specify the business practices of MA, nor ..."
     check: found on page 4 only (ok)
 
-20. [Q12m] rank 9: "limit on the ability to transfer the license to a third party"
-    DigitalCinemaDestinationsCorp_20111220_S-1_EX-10.10_7346719_EX-10.10_Affiliate Agreement.pdf · page 13 · characters 38077-39111
-    starts: "Section 3.12 License. NCM hereby grants to Network Affiliate at no cost ..."
-    check: found on page 13 only (ok)
+20. [Q12m] rank 1: "limit on the ability to transfer the license to a third party"
+    2ThemartComInc_19990826_10-12G_EX-10.10_6700288_EX-10.10_Co-Branding Agreement_ Agency Agreement.pdf · page 4 · characters 12244-12942
+    starts: "6.5 LIMITS ON SUBLICENSING. All rights (under any applicable intellectual property right) ..."
+    check: found on page 4 only (ok)
+
+==============================================================================
+T11: the Windows zip's DLL imports
+measures: that the Windows executable needs only DLLs that ship with Windows (no Visual C++ runtime)
+commit:   release zip qorfinder-v0.0.0-windows-x86_64.zip (tag v0.0.0 = 4fa29e5), run as unpacked
+machine:  Lenovo ThinkPad T590 (testing machine), Windows 10 Pro 22H2 (build 19045)
+commands: dumpbin /dependents qorfinder.exe (Visual Studio 2022 Build Tools 14.44), and every *.dll name in the file
+
+$ dumpbin /dependents qorfinder.exe
+Microsoft (R) COFF/PE Dumper Version 14.44.35230.0
+Copyright (C) Microsoft Corporation.  All rights reserved.
+
+
+Dump of file qorfinder.exe
+
+File Type: EXECUTABLE IMAGE
+
+  Image has the following dependencies:
+
+    bcryptprimitives.dll
+    kernel32.dll
+    api-ms-win-core-synch-l1-2-0.dll
+    shell32.dll
+    combase.dll
+    ntdll.dll
+    ws2_32.dll
+    shlwapi.dll
+    psapi.dll
+    ole32.dll
+
+  Summary
+
+       17000 .data
+        1000 .fptable
+       8A000 .pdata
+      4B8000 .rdata
+       1B000 .reloc
+      E3F000 .text
+DLL names in the executable: api-ms-win-core-synch-l1-2-0.dll, bcryptprimitives.dll, combase.dll, dbghelp.dll, kernel32.dll, ntdll.dll, ole32.dll, psapi.dll, shell32.dll, shlwapi.dll, ws2_32.dll
+VCRUNTIME or api-ms-win-crt named: False
 
 ==============================================================================
 T11, T1, T5 and T8: the Linux zip on Linux Mint
