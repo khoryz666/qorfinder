@@ -2,30 +2,31 @@ How fast and how heavy QorFinder is: indexing time and peak memory, index size, 
 timing.csv holds every query's encode, scan and total time (median of 5 runs) for each run below.
 
 ==============================================================================
-Full index of all 510 CUAD contracts on the testing machine (before the page furniture fix)
-measures: index time, peak memory, index size; query latency over 39,307 chunks
-note:     made before 7b63069 with the base all-MiniLM-L6-v2; the rerun with the fix and the fine-tuned
-          default model on this machine is still to do. The dev machine section below has both.
-commit:   540a865 (release build, cargo build --release, rustc 1.96.0); embeds 4 batches at a time as in 1637c07
+Full index of all 510 CUAD contracts on the testing machine
+measures: index time, peak memory, index size; query latency over 37,626 chunks, with the default model
+          (all-MiniLM-L6-v2-ft-cuad)
+commit:   release zip qorfinder-v0.0.0-windows-x86_64.zip (tag v0.0.0 = 4fa29e5), run as unpacked;
+          sha256 fb3a1772a3d82d441e5354653e8a0ea3c890acd5f3df86fe072dd7dea9be4c5f, as on the GitHub release
 machine:  Lenovo ThinkPad T590 (testing machine), Intel Core i5-8365U (4 cores, 8 threads), 16 GB RAM, Windows 10 Pro 22H2 (build 19045)
 commands: qorfinder --index-dir data/full-index-t590 index data/cuad/txt
-          qorfinder --index-dir data/full-index-t590 eval --timing --out results/2026-11-17-540a865-t590
+          qorfinder --index-dir data/full-index-t590 eval --timing --out <dir>
+          Windows was kept awake; the system log had no sleep event during the index
 
 qorfinder --index-dir data/full-index-t590 index data/cuad/txt
-indexed 510 document(s), 39307 chunk(s), 0 skipped, in 3491.2 s (prepare 13.6 s, embed 3477.3 s, 11.3 chunks/s)
+indexed 510 document(s), 37626 chunk(s), 0 skipped, in 2523.9 s (prepare 11.8 s, embed 2511.7 s, 15.0 chunks/s)
 index saved to data/full-index-t590
-peak memory 1709.5 MB
-wall clock: 3492 s
+peak memory 1579.5 MB
+wall clock: 2525 s
 
-index size: 93.0 MB (93045248 bytes)
+index size: 90.3 MB (90323968 bytes)
 source size: 26.8 MB (26820468 bytes)
 
-qorfinder --index-dir data/full-index-t590 eval --timing --out results/2026-11-17-540a865-t590
-34 queries over 39307 chunks, median of 5 runs each
- total: median 31.5 ms, p95 39.6 ms
-encode: median 13.7 ms, p95 16.5 ms
-  scan: median 17.9 ms, p95 22.9 ms
-peak memory 214.9 MB
+qorfinder --index-dir data/full-index-t590 eval --timing --out <dir>
+34 queries over 37626 chunks, median of 5 runs each
+ total: median 32.4 ms, p95 33.8 ms
+encode: median 13.3 ms, p95 15.8 ms
+  scan: median 19.1 ms, p95 19.3 ms
+peak memory 223.6 MB
 
 ==============================================================================
 Full index of all 510 CUAD contracts on the dev machine
