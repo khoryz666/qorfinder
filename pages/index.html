@@ -52,12 +52,12 @@
 </section>
 
 <section class="stats" aria-label="Measured on a 2019 laptop">
-  <div class="stat reveal"><b data-count="32" data-unit=" ms">32 ms</b><span>to search 39,307 passages, median</span></div>
-  <div class="stat reveal"><b data-count="215" data-unit=" MB">215 MB</b><span>of memory while searching</span></div>
-  <div class="stat reveal"><b data-count="7" data-unit=" s">7 s</b><span>to index a contract, on average</span></div>
+  <div class="stat reveal"><b data-count="32" data-unit=" ms">32 ms</b><span>to search 37,626 passages, median</span></div>
+  <div class="stat reveal"><b data-count="224" data-unit=" MB">224 MB</b><span>of memory while searching</span></div>
+  <div class="stat reveal"><b data-count="5" data-unit=" s">5 s</b><span>to index a contract, on average</span></div>
   <div class="stat reveal"><b data-count="0" data-unit="">0</b><span>bytes sent over the network</span></div>
   <p class="note reveal">Measured on a Lenovo ThinkPad T590 (Intel Core i5-8365U, 16 GB, Windows 10) over all 510 CUAD contracts,
-    with the general model; the fine-tuned model has the same size.</p>
+    with the default fine-tuned model.</p>
 </section>
 
 <section id="accuracy" class="accuracy">
@@ -160,7 +160,7 @@ qorfinder search "can the employee work for a competitor after leaving?"</code><
   <ul class="reveal">
     <li><b>English only.</b> Both models were trained on English text.</li>
     <li><b>No scanned documents.</b> A PDF needs a text layer; QorFinder does not read text from images.</li>
-    <li><b>Indexing takes a while.</b> About 7 seconds per contract on a 2019 laptop; searching afterwards takes milliseconds.</li>
+    <li><b>Indexing takes a while.</b> About 5 seconds per contract on a 2019 laptop; searching afterwards takes milliseconds.</li>
     <li><b>Results are leads, not advice.</b> The right clause is not always first, and now and then a heading on its own
       slips in. Always read the clause itself before you rely on it.</li>
   </ul>
